@@ -69,6 +69,7 @@ struct demo {
 	struct demo_hdr hdr;
 	size_t nmsgs;
 	struct demo_msg **msgs;
+	uint32_t checksum;
 };
 
 struct demo *demo_parse(const char *path);

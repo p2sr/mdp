@@ -2,9 +2,11 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdbool.h>
 
 #include "common.h"
 #include "demo.h"
+#include "crc_table.h"
 
 #define HDR_SIZE 1072
 
@@ -27,7 +29,7 @@ static inline void _msg_free(struct demo_msg *msg) {
 	case DEMO_MSG_CONSOLE_CMD:
 		free(msg->con_cmd);
 		break;
-	
+
 	case DEMO_MSG_SAR_DATA:
 		_sar_data_free(msg->sar_data);
 		break;
@@ -109,14 +111,13 @@ static int _parse_sar_data(struct sar_data *out, FILE *f, size_t len) {
 		return 0;
 
 	case SAR_DATA_CHECKSUM:
-
 		if (len != 9) {
 			out->type = SAR_DATA_INVALID;
 			return 0;
 		}
 
-		out->checksum.demo_sum = _read_f32(data);
-		out->checksum.sar_sum = _read_f32(data + 4);
+		out->checksum.demo_sum = _read_u32(data);
+		out->checksum.sar_sum = _read_u32(data + 4);
 
 		return 0;
 
@@ -234,7 +235,7 @@ static struct demo_msg *_parse_msg(FILE *f) {
 
 		// SAR data!
 		msg->type = DEMO_MSG_SAR_DATA;
-		
+
 		// the first 8 bytes we ignore
 		SKIP_BYTES(8);
 
@@ -256,7 +257,7 @@ static struct demo_msg *_parse_msg(FILE *f) {
 
 		return msg;
 	}
-		
+
 	default:
 		free(msg);
 		return NULL;
@@ -264,6 +265,30 @@ static struct demo_msg *_parse_msg(FILE *f) {
 
 #undef READ_U32
 #undef SKIP_BYTES
+}
+
+// }}}
+
+// _demo_checksum {{{
+
+static uint32_t _demo_checksum(FILE *f) {
+	if (fseek(f, -31, SEEK_END)) return 0; // ignore checksum message
+
+	size_t size = ftell(f);
+	if (size == -1) return 0;
+
+	if (fseek(f, 0, SEEK_SET)) return 0;
+
+	uint32_t crc = 0xFFFFFFFF;
+
+	for (size_t i = 0; i < size; ++i) {
+		uint8_t byte = fgetc(f);
+
+		uint8_t lookup_idx = (crc ^ byte) & 0xFF;
+		crc = (crc >> 8) ^ g_crc_table[lookup_idx];
+	}
+
+	return ~crc;
 }
 
 // }}}
@@ -278,7 +303,7 @@ struct demo *demo_parse(const char *path) {
 	}
 
 	// Header {{{
-	
+
 	uint8_t *hdr_buf = malloc(HDR_SIZE);
 
 	if (fread(hdr_buf, 1, HDR_SIZE, f) != HDR_SIZE) {
@@ -318,9 +343,9 @@ struct demo *demo_parse(const char *path) {
 	free(hdr_buf);
 
 	// }}}
-	
+
 	// Messages {{{
-	
+
 	size_t msg_alloc = 512;
 	size_t msg_count = 0;
 	struct demo_msg **msgs = malloc(msg_alloc * sizeof msgs[0]);
@@ -352,13 +377,28 @@ struct demo *demo_parse(const char *path) {
 	}
 
 	// }}}
-	
+
+	// Checksum {{{
+
+	uint32_t checksum = 0;
+
+	if (msg_count > 0) {
+		struct demo_msg *last = msgs[msg_count - 1];
+		if (last->type == DEMO_MSG_SAR_DATA && last->sar_data.type == SAR_DATA_CHECKSUM) {
+			// There's a SAR checksum message - calculate the demo checksum
+			checksum = _demo_checksum(f);
+		}
+	}
+
+	// }}}
+
 	fclose(f);
-	
+
 	struct demo *demo = malloc(sizeof *demo);
 	demo->hdr = hdr;
 	demo->nmsgs = msg_count;
 	demo->msgs = msgs;
+	demo->checksum = checksum;
 
 	return demo;
 }
