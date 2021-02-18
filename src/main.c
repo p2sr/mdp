@@ -17,10 +17,7 @@ static void _output_sar_data(uint32_t tick, struct sar_data data) {
 	case SAR_DATA_INITIAL_CVAR:
 		fprintf(g_outfile, "\t\t[%5u] [SAR] cvar '%s' = '%s'\n", tick, data.initial_cvar.cvar, data.initial_cvar.val);
 		break;
-	case SAR_DATA_CHECKSUM:
-		fprintf(g_outfile, "\t\t[%5u] [SAR] checksum %X %X\n", tick, data.checksum.demo_sum, data.checksum.sar_sum);
-		break;
-	case SAR_DATA_INVALID:
+	default:
 		fprintf(g_outfile, "\t\t[%5u] [SAR] corrupt data!\n", tick);
 		break;
 	}
@@ -41,6 +38,17 @@ static void _output_msg(struct demo_msg *msg) {
 	}
 }
 
+static void _validate_checksum(uint32_t demo_given, uint32_t sar_given, uint32_t demo_real) {
+	bool demo_matches = demo_given == demo_real;
+	if (demo_matches) {
+		fprintf(g_outfile, "\tdemo checksum PASS (%X)\n", demo_real);
+	} else {
+		fprintf(g_outfile, "\tdemo checksum FAIL (%X; should be %X)\n", demo_given, demo_real);
+	}
+
+	// TODO: sar checksum
+}
+
 void run_demo(const char *path) {
 	struct demo *demo = demo_parse(path);
 
@@ -59,13 +67,17 @@ void run_demo(const char *path) {
 	fprintf(g_outfile, "\t\tplayback ticks: %u\n", demo->hdr.playback_ticks);
 	fprintf(g_outfile, "\t\tplayback frames: %u\n", demo->hdr.playback_frames);
 	fprintf(g_outfile, "\t\tsign on length: %u\n", demo->hdr.sign_on_length);
-	fprintf(g_outfile, "\t\tchecksum: %X\n", demo->checksum);
 	fprintf(g_outfile, "\tevents:\n");
 	for (size_t i = 0; i < demo->nmsgs; ++i) {
 		struct demo_msg *msg = demo->msgs[i];
-		_output_msg(msg);
+		if (i == demo->nmsgs - 1 && msg->type == DEMO_MSG_SAR_DATA && msg->sar_data.type == SAR_DATA_CHECKSUM) {
+			// ending checksum data - validate it
+			_validate_checksum(msg->sar_data.checksum.demo_sum, msg->sar_data.checksum.sar_sum, demo->checksum);
+		} else {
+			// normal message
+			_output_msg(msg);
+		}
 	}
-
 
 	demo_free(demo);
 }
