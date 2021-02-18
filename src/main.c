@@ -1,10 +1,13 @@
 #include <stdio.h>
 
 #include "common.h"
+#include "config.h"
 #include "demo.h"
 
 FILE *g_errfile;
 FILE *g_outfile;
+
+static char **g_cmd_whitelist;
 
 static void _output_sar_data(uint32_t tick, struct sar_data data) {
 	switch (data.type) {
@@ -26,7 +29,9 @@ static void _output_sar_data(uint32_t tick, struct sar_data data) {
 static void _output_msg(struct demo_msg *msg) {
 	switch (msg->type) {
 	case DEMO_MSG_CONSOLE_CMD:
-		fprintf(g_outfile, "\t\t[%5u] %s\n", msg->tick, msg->con_cmd);
+		if (!config_check_cmd_whitelist(g_cmd_whitelist, msg->con_cmd)) {
+			fprintf(g_outfile, "\t\t[%5u] %s\n", msg->tick, msg->con_cmd);
+		}
 		break;
 	case DEMO_MSG_SAR_DATA:
 		_output_sar_data(msg->tick, msg->sar_data);
@@ -68,6 +73,8 @@ void run_demo(const char *path) {
 int main(void) {
 	g_errfile = stderr;
 	g_outfile = stdout;
+
+	g_cmd_whitelist = config_read_cmd_whitelist("whitelist.txt");
 
 	run_demo("test.dem");
 
