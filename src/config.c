@@ -72,9 +72,11 @@ bool config_check_sum_whitelist(char **sums, uint32_t sum) {
 	if (!sums) return false;
 	while (*sums) {
 		char *end;
-		uint32_t valid = strtol(*sums, &end, 16);
-		if (end == *sums || *end != 0) continue;
-		if (valid == sum) return true;
+		uint32_t valid = strtoll(*sums, &end, 16);
+		if (end != *sums && *end == 0) {
+			if (valid == sum) return true;
+		}
+		++sums;
 	}
 	return false;
 }
