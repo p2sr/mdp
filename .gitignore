@@ -1,4 +1,8 @@
 obj
 mdp
 *.dem
-whitelist.txt
+cmd_whitelist.txt
+sar_whitelist.txt
+errors.txt
+output.txt
+demos/

@@ -1,13 +1,23 @@
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <dirent.h>
 
 #include "common.h"
 #include "config.h"
 #include "demo.h"
 
+#define DEMO_DIR "demos"
+#define ERR_FILE "errors.txt"
+#define OUT_FILE "output.txt"
+#define CMD_WHITELIST_FILE "cmd_whitelist.txt"
+#define SAR_WHITELIST_FILE "sar_whitelist.txt"
+
 FILE *g_errfile;
 FILE *g_outfile;
 
 static char **g_cmd_whitelist;
+static char **g_sar_sum_whitelist;
 
 static void _output_sar_data(uint32_t tick, struct sar_data data) {
 	switch (data.type) {
@@ -46,7 +56,11 @@ static void _validate_checksum(uint32_t demo_given, uint32_t sar_given, uint32_t
 		fprintf(g_outfile, "\tdemo checksum FAIL (%X; should be %X)\n", demo_given, demo_real);
 	}
 
-	// TODO: sar checksum
+	if (config_check_sum_whitelist(g_sar_sum_whitelist, sar_given)) {
+		fprintf(g_outfile, "\tSAR checksum PASS (%X)\n", sar_given);
+	} else {
+		fprintf(g_outfile, "\tSAR checksum FAIL (%X)\n", sar_given);
+	}
 }
 
 void run_demo(const char *path) {
@@ -83,12 +97,45 @@ void run_demo(const char *path) {
 }
 
 int main(void) {
-	g_errfile = stderr;
-	g_outfile = stdout;
+	g_errfile = fopen(ERR_FILE, "w");
+	g_outfile = fopen(OUT_FILE, "w");
 
-	g_cmd_whitelist = config_read_cmd_whitelist("whitelist.txt");
+	g_cmd_whitelist = config_read_newline_sep(CMD_WHITELIST_FILE);
+	g_sar_sum_whitelist = config_read_newline_sep(SAR_WHITELIST_FILE);
 
-	run_demo("test.dem");
+	DIR *d = opendir(DEMO_DIR);
+	if (d) {
+		size_t demo_dir_len = strlen(DEMO_DIR);
+		struct dirent *ent;
+		bool is_first = true;
+		while ((ent = readdir(d))) {
+			if (!strcmp(ent->d_name, ".")) continue;
+			if (!strcmp(ent->d_name, "..")) continue;
+
+			if (!is_first) {
+				fputs("\n", g_outfile);
+			}
+
+			is_first = false;
+
+			char *path = malloc(demo_dir_len + strlen(ent->d_name) + 2);
+			strcpy(path, DEMO_DIR);
+			strcat(path, "/");
+			strcat(path, ent->d_name);
+
+			run_demo(path);
+
+			free(path);
+		}
+	} else {
+		fprintf(g_errfile, "failed to open demos folder '%s'\n", DEMO_DIR);
+	}
+
+	config_free_newline_sep(g_cmd_whitelist);
+	config_free_newline_sep(g_sar_sum_whitelist);
+
+	fclose(g_errfile);
+	fclose(g_outfile);
 
 	return 0;
 }
