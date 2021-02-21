@@ -193,6 +193,8 @@ static struct demo_msg *_parse_msg(FILE *f) {
 			return NULL;
 		}
 
+		util_strip_whitespace(msg->con_cmd);
+
 		return msg;
 	}
 
