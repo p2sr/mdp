@@ -72,15 +72,7 @@ void run_demo(const char *path) {
 	}
 
 	fprintf(g_outfile, "demo: '%s'\n", path);
-	fprintf(g_outfile, "\theader:\n");
-	fprintf(g_outfile, "\t\tserver: %s\n", demo->hdr.server_name);
-	fprintf(g_outfile, "\t\tclient: %s\n", demo->hdr.client_name);
-	fprintf(g_outfile, "\t\tmap: %s\n", demo->hdr.map_name);
-	fprintf(g_outfile, "\t\tgame dir: %s\n", demo->hdr.game_directory);
-	fprintf(g_outfile, "\t\tplayback time: %f\n", demo->hdr.playback_time);
-	fprintf(g_outfile, "\t\tplayback ticks: %u\n", demo->hdr.playback_ticks);
-	fprintf(g_outfile, "\t\tplayback frames: %u\n", demo->hdr.playback_frames);
-	fprintf(g_outfile, "\t\tsign on length: %u\n", demo->hdr.sign_on_length);
+	fprintf(g_outfile, "\t'%s' on %s - %.2f TPS\n", demo->hdr.client_name, demo->hdr.map_name, (float)demo->hdr.playback_ticks / demo->hdr.playback_time);
 	fprintf(g_outfile, "\tevents:\n");
 	for (size_t i = 0; i < demo->nmsgs; ++i) {
 		struct demo_msg *msg = demo->msgs[i];
