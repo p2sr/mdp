@@ -16,9 +16,9 @@ void util_strip_whitespace(char *str) {
 	str[len] = 0;
 }
 
-bool util_is_prefix(const char *prefix, const char *str) {
+bool util_is_prefix_i(const char *prefix, const char *str) {
 	while (*prefix) {
-		if (*prefix != *str) return false;
+		if (tolower(*prefix) != tolower(*str)) return false;
 		++prefix, ++str;
 	}
 	return true;

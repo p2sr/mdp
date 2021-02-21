@@ -4,6 +4,6 @@
 #include <stdbool.h>
 
 void util_strip_whitespace(char *str);
-bool util_is_prefix(const char *prefix, const char *str);
+bool util_is_prefix_i(const char *prefix, const char *str);
 
 #endif

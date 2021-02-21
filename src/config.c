@@ -62,7 +62,7 @@ char **config_read_newline_sep(const char *path) {
 bool config_check_cmd_whitelist(char **cmds, const char *cmd) {
 	if (!cmds) return false;
 	while (*cmds) {
-		if (util_is_prefix(*cmds, cmd)) return true;
+		if (util_is_prefix_i(*cmds, cmd)) return true;
 		++cmds;
 	}
 	return false;
