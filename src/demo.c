@@ -1,12 +1,13 @@
-#include <stdio.h>
+#include <stdbool.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdbool.h>
 
 #include "common.h"
-#include "demo.h"
 #include "crc_table.h"
+#include "demo.h"
+#include "util.h"
 
 #define HDR_SIZE 1072
 
