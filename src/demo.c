@@ -20,6 +20,13 @@ static inline void _sar_data_free(struct sar_data data) {
 		free(data.initial_cvar.val);
 		break;
 
+	case SAR_DATA_ENTITY_INPUT:
+		free(data.entity_input.targetname);
+		free(data.entity_input.classname);
+		free(data.entity_input.inputname);
+		free(data.entity_input.parameter);
+		break;
+
 	default:
 		break;
 	}
@@ -107,8 +114,18 @@ static int _parse_sar_data(struct sar_data *out, FILE *f, size_t len) {
 		return 0;
 
 	case SAR_DATA_INITIAL_CVAR:
-		out->initial_cvar.cvar = strdup((const char *)data);
-		out->initial_cvar.val = strdup((const char *)(data + strlen((const char *)data) + 1));
+		out->initial_cvar.cvar = strdup((char *)data);
+		out->initial_cvar.val = strdup((char *)data + strlen((const char *)data) + 1);
+		return 0;
+
+	case SAR_DATA_ENTITY_INPUT:
+		out->entity_input.targetname = strdup((char *)data);
+		size_t targetname_len = strlen(out->entity_input.targetname);
+		out->entity_input.classname = strdup((char *)data + targetname_len + 1);
+		size_t classname_len = strlen(out->entity_input.classname);
+		out->entity_input.inputname = strdup((char *)data + targetname_len + classname_len + 2);
+		size_t inputname_len = strlen(out->entity_input.inputname);
+		out->entity_input.parameter = strdup((char *)data + targetname_len + classname_len + inputname_len + 3);
 		return 0;
 
 	case SAR_DATA_CHECKSUM:

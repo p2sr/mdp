@@ -18,6 +18,7 @@ struct sar_data {
 	enum {
 		SAR_DATA_TIMESCALE_CHEAT = 0x01,
 		SAR_DATA_INITIAL_CVAR = 0x02,
+		SAR_DATA_ENTITY_INPUT = 0x03,
 		SAR_DATA_CHECKSUM = 0xFF,
 
 		SAR_DATA_INVALID,
@@ -35,6 +36,13 @@ struct sar_data {
 			uint32_t demo_sum;
 			uint32_t sar_sum;
 		} checksum;
+
+		struct {
+			char *targetname;
+			char *classname;
+			char *inputname;
+			char *parameter;
+		} entity_input;
 	};
 };
 
