@@ -118,6 +118,9 @@ static int _parse_sar_data(struct sar_data *out, FILE *f, size_t len) {
 		out->initial_cvar.val = strdup((char *)data + strlen((const char *)data) + 1);
 		return 0;
 
+	case SAR_DATA_ENTITY_INPUT_SLOT:
+		out->slot = data[0];
+		++data;
 	case SAR_DATA_ENTITY_INPUT:
 		out->entity_input.targetname = strdup((char *)data);
 		size_t targetname_len = strlen(out->entity_input.targetname);
@@ -137,6 +140,30 @@ static int _parse_sar_data(struct sar_data *out, FILE *f, size_t len) {
 		out->checksum.demo_sum = _read_u32(data);
 		out->checksum.sar_sum = _read_u32(data + 4);
 
+		return 0;
+
+	case SAR_DATA_PORTAL_PLACEMENT:
+		if (len != 15) {
+			out->type = SAR_DATA_INVALID;
+			return 0;
+		}
+
+		out->slot = data[0];
+		out->portal_placement.orange = data[1];
+		out->portal_placement.x = _read_f32(data + 2);
+		out->portal_placement.x = _read_f32(data + 6);
+		out->portal_placement.x = _read_f32(data + 10);
+
+		return 0;
+
+	case SAR_DATA_CHALLENGE_FLAGS:
+	case SAR_DATA_CROUCH_FLY:
+		if (len != 2) {
+			out->type = SAR_DATA_INVALID;
+			return 0;
+		}
+
+		out->slot = data[0];
 		return 0;
 
 	default:

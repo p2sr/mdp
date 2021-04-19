@@ -19,10 +19,16 @@ struct sar_data {
 		SAR_DATA_TIMESCALE_CHEAT = 0x01,
 		SAR_DATA_INITIAL_CVAR = 0x02,
 		SAR_DATA_ENTITY_INPUT = 0x03,
+		SAR_DATA_ENTITY_INPUT_SLOT = 0x04,
+		SAR_DATA_PORTAL_PLACEMENT = 0x05,
+		SAR_DATA_CHALLENGE_FLAGS = 0x06,
+		SAR_DATA_CROUCH_FLY = 0x07,
 		SAR_DATA_CHECKSUM = 0xFF,
 
 		SAR_DATA_INVALID,
 	} type;
+
+	int slot;
 
 	union {
 		float timescale;
@@ -43,6 +49,11 @@ struct sar_data {
 			char *inputname;
 			char *parameter;
 		} entity_input;
+
+		struct {
+			float x, y, z;
+			bool orange;
+		} portal_placement;
 	};
 };
 

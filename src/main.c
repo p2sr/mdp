@@ -27,11 +27,11 @@ static void _output_sar_data(uint32_t tick, struct sar_data data) {
 	case SAR_DATA_INITIAL_CVAR:
 		fprintf(g_outfile, "\t\t[%5u] [SAR] cvar '%s' = '%s'\n", tick, data.initial_cvar.cvar, data.initial_cvar.val);
 		break;
-	case SAR_DATA_ENTITY_INPUT:
-		// don't care
+	case SAR_DATA_INVALID:
+		fprintf(g_outfile, "\t\t[%5u] [SAR] corrupt data!\n", tick);
 		break;
 	default:
-		fprintf(g_outfile, "\t\t[%5u] [SAR] corrupt data!\n", tick);
+		// don't care
 		break;
 	}
 }
