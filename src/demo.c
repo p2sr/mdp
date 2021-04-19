@@ -1,3 +1,4 @@
+#include <math.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -381,8 +382,8 @@ struct demo *demo_parse(const char *path) {
 		.client_name = strdup((char *)(hdr_buf + 276)),
 		.map_name = strdup((char *)(hdr_buf + 536)),
 		.game_directory = strdup((char *)(hdr_buf + 796)),
-		.playback_time = _read_f32(hdr_buf + 1056),
-		.playback_ticks = _read_u32(hdr_buf + 1060),
+		.playback_time = fabsf(_read_f32(hdr_buf + 1056)),
+		.playback_ticks = abs((int32_t)_read_u32(hdr_buf + 1060)),
 		.playback_frames = _read_u32(hdr_buf + 1064),
 		.sign_on_length = _read_u32(hdr_buf + 1068),
 	};
