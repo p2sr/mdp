@@ -82,13 +82,13 @@ static void _output_msg(struct demo_msg *msg) {
 static void _validate_checksum(uint32_t demo_given, uint32_t sar_given, uint32_t demo_real) {
 	bool demo_matches = demo_given == demo_real;
 	if (demo_matches) {
-		fprintf(g_outfile, "\tdemo checksum PASS (%X)\n", demo_real);
+		//fprintf(g_outfile, "\tdemo checksum PASS (%X)\n", demo_real);
 	} else {
 		fprintf(g_outfile, "\tdemo checksum FAIL (%X; should be %X)\n", demo_given, demo_real);
 	}
 
 	if (config_check_sum_whitelist(g_sar_sum_whitelist, sar_given)) {
-		fprintf(g_outfile, "\tSAR checksum PASS (%X)\n", sar_given);
+		//fprintf(g_outfile, "\tSAR checksum PASS (%X)\n", sar_given);
 	} else {
 		fprintf(g_outfile, "\tSAR checksum FAIL (%X)\n", sar_given);
 	}
@@ -102,18 +102,25 @@ void run_demo(const char *path) {
 		return;
 	}
 
+	bool has_csum = false;
+
 	fprintf(g_outfile, "demo: '%s'\n", path);
-	fprintf(g_outfile, "\t'%s' on %s - %.2f TPS\n", demo->hdr.client_name, demo->hdr.map_name, (float)demo->hdr.playback_ticks / demo->hdr.playback_time);
+	fprintf(g_outfile, "\t'%s' on %s - %.2f TPS - %d ticks\n", demo->hdr.client_name, demo->hdr.map_name, (float)demo->hdr.playback_ticks / demo->hdr.playback_time, demo->hdr.playback_ticks);
 	fprintf(g_outfile, "\tevents:\n");
 	for (size_t i = 0; i < demo->nmsgs; ++i) {
 		struct demo_msg *msg = demo->msgs[i];
 		if (i == demo->nmsgs - 1 && msg->type == DEMO_MSG_SAR_DATA && msg->sar_data.type == SAR_DATA_CHECKSUM) {
 			// ending checksum data - validate it
 			_validate_checksum(msg->sar_data.checksum.demo_sum, msg->sar_data.checksum.sar_sum, demo->checksum);
+			has_csum = true;
 		} else {
 			// normal message
 			_output_msg(msg);
 		}
+	}
+
+	if (!has_csum) {
+		fputs("\tno checksums found; vanilla demo?\n", g_outfile);
 	}
 
 	demo_free(demo);
