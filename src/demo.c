@@ -167,6 +167,15 @@ static int _parse_sar_data(struct sar_data *out, FILE *f, size_t len) {
 		out->slot = data[0];
 		return 0;
 
+	case SAR_DATA_PAUSE:
+		if (len != 5) {
+			out->type = SAR_DATA_INVALID;
+			return 0;
+		}
+
+		out->pause_ticks = _read_u32(data);
+		return 0;
+
 	default:
 		out->type = SAR_DATA_INVALID;
 		return 0;

@@ -23,6 +23,7 @@ struct sar_data {
 		SAR_DATA_PORTAL_PLACEMENT = 0x05,
 		SAR_DATA_CHALLENGE_FLAGS = 0x06,
 		SAR_DATA_CROUCH_FLY = 0x07,
+		SAR_DATA_PAUSE = 0x08,
 		SAR_DATA_CHECKSUM = 0xFF,
 
 		SAR_DATA_INVALID,
@@ -32,6 +33,7 @@ struct sar_data {
 
 	union {
 		float timescale;
+		uint32_t pause_ticks;
 
 		struct {
 			char *cvar;

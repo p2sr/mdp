@@ -19,13 +19,41 @@ FILE *g_outfile;
 static char **g_cmd_whitelist;
 static char **g_sar_sum_whitelist;
 
+static bool _allow_initial_cvar(const char *var, const char *val) {
+#define ALLOW(x, y) if (!strcmp(var, #x) && !strcmp(val, y)) return true
+#define ALLOWINT(x, y) if (!strcmp(var, #x) && atoi(val) == y) return true
+#define ALLOWRANGE(x, y, z) if (!strcmp(var, #x) && atoi(val) >= y && atoi(val) <= z) return true
+
+	ALLOWINT(host_timescale, 1);
+	ALLOWINT(sv_alternateticks, 1);
+	ALLOWINT(sv_allow_mobile_portals, 0);
+	ALLOWINT(sv_portal_placement_debug, 0);
+	ALLOWINT(cl_cmdrate, 30);
+	ALLOWINT(cl_updaterate, 20);
+	ALLOWRANGE(cl_fov, 45, 140);
+	ALLOWRANGE(fps_max, 30, 999);
+	ALLOW(sv_use_trace_duration, "0.5");
+	ALLOW(m_yaw, "0.022");
+
+	return false;
+
+#undef ALLOW
+#undef ALLOWINT
+#undef ALLOWRANGE
+}
+
 static void _output_sar_data(uint32_t tick, struct sar_data data) {
 	switch (data.type) {
 	case SAR_DATA_TIMESCALE_CHEAT:
 		fprintf(g_outfile, "\t\t[%5u] [SAR] timescale %.2f\n", tick, data.timescale);
 		break;
 	case SAR_DATA_INITIAL_CVAR:
-		fprintf(g_outfile, "\t\t[%5u] [SAR] cvar '%s' = '%s'\n", tick, data.initial_cvar.cvar, data.initial_cvar.val);
+		if (!_allow_initial_cvar(data.initial_cvar.cvar, data.initial_cvar.val)) {
+			fprintf(g_outfile, "\t\t[%5u] [SAR] cvar '%s' = '%s'\n", tick, data.initial_cvar.cvar, data.initial_cvar.val);
+		}
+		break;
+	case SAR_DATA_PAUSE:
+		fprintf(g_outfile, "\t\t[%5u] [SAR] paused for %d ticks (%.2fs)\n", tick, data.pause_ticks, (float)data.pause_ticks / 60.0f);
 		break;
 	case SAR_DATA_INVALID:
 		fprintf(g_outfile, "\t\t[%5u] [SAR] corrupt data!\n", tick);
