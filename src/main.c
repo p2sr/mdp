@@ -10,6 +10,7 @@
 #define DEMO_DIR "demos"
 #define ERR_FILE "errors.txt"
 #define OUT_FILE "output.txt"
+#define EXPECTED_MAPS_FILE "expected_maps.txt"
 #define CMD_WHITELIST_FILE "cmd_whitelist.txt"
 #define SAR_WHITELIST_FILE "sar_whitelist.txt"
 
@@ -42,9 +43,20 @@ static bool _allow_initial_cvar(const char *var, const char *val) {
 #undef ALLOWRANGE
 }
 
+// janky hack lol
+static const char *const _g_map_found = "_MAP_FOUND";
+static const char **_g_expected_maps;
+
+static bool _g_detected_timescale;
+static int _g_num_timescale;
+
 static void _output_sar_data(uint32_t tick, struct sar_data data) {
 	switch (data.type) {
 	case SAR_DATA_TIMESCALE_CHEAT:
+		if (!_g_detected_timescale) {
+			++_g_num_timescale;
+			_g_detected_timescale = true;
+		}
 		fprintf(g_outfile, "\t\t[%5u] [SAR] timescale %.2f\n", tick, data.timescale);
 		break;
 	case SAR_DATA_INITIAL_CVAR:
@@ -119,6 +131,15 @@ void run_demo(const char *path) {
 		}
 	}
 
+	if (_g_expected_maps) {
+		for (size_t i = 0; _g_expected_maps[i]; ++i) {
+			if (_g_expected_maps[i] == _g_map_found) continue; // This pointer equality check is intentional
+			if (!strcmp(_g_expected_maps[i], demo->hdr.map_name)) {
+				_g_expected_maps[i] = _g_map_found;
+			}
+		}
+	}
+
 	if (!has_csum) {
 		fputs("\tno checksums found; vanilla demo?\n", g_outfile);
 	}
@@ -130,6 +151,7 @@ int main(void) {
 	g_errfile = fopen(ERR_FILE, "w");
 	g_outfile = fopen(OUT_FILE, "w");
 
+	_g_expected_maps = (const char **)config_read_newline_sep(EXPECTED_MAPS_FILE);
 	g_cmd_whitelist = config_read_newline_sep(CMD_WHITELIST_FILE);
 	g_sar_sum_whitelist = config_read_newline_sep(SAR_WHITELIST_FILE);
 
@@ -153,12 +175,27 @@ int main(void) {
 			strcat(path, "/");
 			strcat(path, ent->d_name);
 
+			_g_detected_timescale = false;
 			run_demo(path);
 
 			free(path);
 		}
 	} else {
 		fprintf(g_errfile, "failed to open demos folder '%s'\n", DEMO_DIR);
+	}
+
+	fprintf(g_outfile, "\ntimescale detected on %u demos\n", _g_num_timescale);
+
+	if (_g_expected_maps) {
+		bool did_hdr = false;
+		for (size_t i = 0; _g_expected_maps[i]; ++i) {
+			if (_g_expected_maps[i] == _g_map_found) continue; // This pointer equality check is intentional
+			if (!did_hdr) {
+				did_hdr = true;
+				fputs("missing maps:\n", g_outfile);
+			}
+			fprintf(g_outfile, "\t%s\n", _g_expected_maps[i]);
+		}
 	}
 
 	config_free_newline_sep(g_cmd_whitelist);
