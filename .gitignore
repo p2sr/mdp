@@ -8,3 +8,4 @@ expected_maps.txt
 errors.txt
 output.txt
 demos/
+config.mk
