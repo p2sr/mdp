@@ -4,7 +4,7 @@ SRCDIR=src
 OBJDIR=obj
 
 CC=clang
-CFLAGS=-Wall -Werror
+CFLAGS=-Wall -Werror -D__USE_MINGW_ANSI_STDIO
 LDFLAGS=-lm
 
 -include config.mk
