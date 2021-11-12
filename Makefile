@@ -3,11 +3,11 @@
 SRCDIR=src
 OBJDIR=obj
 
-#CC=clang
-CC=x86_64-w64-mingw32-gcc
-#CFLAGS=-Wall -Werror -DSHOW_ANTICHEAT
+CC=clang
 CFLAGS=-Wall -Werror
 LDFLAGS=-lm
+
+-include config.mk
 
 SRCS=$(shell find $(SRCDIR) -name '*.c')
 OBJS=$(patsubst $(SRCDIR)/%.c, $(OBJDIR)/%.o, $(SRCS))
