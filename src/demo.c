@@ -28,6 +28,21 @@ static inline void _sar_data_free(struct sar_data data) {
 		free(data.entity_input.parameter);
 		break;
 
+	case SAR_DATA_WAIT_RUN:
+		free(data.wait_run.cmd);
+		break;
+
+	case SAR_DATA_SPEEDRUN_TIME:
+		for (size_t i = 0; i < data.speedrun_time.nsplits; ++i) {
+			for (size_t j = 0; j < data.speedrun_time.splits[i].nsegs; ++j) {
+				free(data.speedrun_time.splits[i].segs[j].name);
+			}
+			free(data.speedrun_time.splits[i].name);
+			free(data.speedrun_time.splits[i].segs);
+		}
+		free(data.speedrun_time.splits);
+		break;
+
 	default:
 		break;
 	}
@@ -102,22 +117,24 @@ static int _parse_sar_data(struct sar_data *out, FILE *f, size_t len) {
 		return 1;
 	}
 
+	uint8_t *data_orig = data; // for freeing later, in case data is mutated
+
 	out->type = type;
 
 	switch (out->type) {
 	case SAR_DATA_TIMESCALE_CHEAT:
 		if (len != 5) {
 			out->type = SAR_DATA_INVALID;
-			return 0;
+			break;
 		}
 
 		out->timescale = _read_f32(data);
-		return 0;
+		break;
 
 	case SAR_DATA_INITIAL_CVAR:
 		out->initial_cvar.cvar = strdup((char *)data);
 		out->initial_cvar.val = strdup((char *)data + strlen((const char *)data) + 1);
-		return 0;
+		break;
 
 	case SAR_DATA_ENTITY_INPUT_SLOT:
 		out->slot = data[0];
@@ -130,23 +147,23 @@ static int _parse_sar_data(struct sar_data *out, FILE *f, size_t len) {
 		out->entity_input.inputname = strdup((char *)data + targetname_len + classname_len + 2);
 		size_t inputname_len = strlen(out->entity_input.inputname);
 		out->entity_input.parameter = strdup((char *)data + targetname_len + classname_len + inputname_len + 3);
-		return 0;
+		break;
 
 	case SAR_DATA_CHECKSUM:
 		if (len != 9) {
 			out->type = SAR_DATA_INVALID;
-			return 0;
+			break;
 		}
 
 		out->checksum.demo_sum = _read_u32(data);
 		out->checksum.sar_sum = _read_u32(data + 4);
 
-		return 0;
+		break;
 
 	case SAR_DATA_PORTAL_PLACEMENT:
 		if (len != 15) {
 			out->type = SAR_DATA_INVALID;
-			return 0;
+			break;
 		}
 
 		out->slot = data[0];
@@ -155,31 +172,78 @@ static int _parse_sar_data(struct sar_data *out, FILE *f, size_t len) {
 		out->portal_placement.x = _read_f32(data + 6);
 		out->portal_placement.x = _read_f32(data + 10);
 
-		return 0;
+		break;
 
 	case SAR_DATA_CHALLENGE_FLAGS:
 	case SAR_DATA_CROUCH_FLY:
 		if (len != 2) {
 			out->type = SAR_DATA_INVALID;
-			return 0;
+			break;
 		}
 
 		out->slot = data[0];
-		return 0;
+		break;
 
 	case SAR_DATA_PAUSE:
 		if (len != 5) {
 			out->type = SAR_DATA_INVALID;
-			return 0;
+			break;
 		}
 
 		out->pause_ticks = _read_u32(data);
-		return 0;
+		break;
+
+	case SAR_DATA_WAIT_RUN:
+		if (len < 6) {
+			out->type = SAR_DATA_INVALID;
+			break;
+		}
+
+		out->wait_run.tick = _read_u32(data);
+		out->wait_run.cmd = strdup((char *)data + 4);
+
+		break;
+
+	case SAR_DATA_SPEEDRUN_TIME:
+		if (len < 5) {
+			out->type = SAR_DATA_INVALID;
+			break;
+		}
+
+		out->speedrun_time.nsplits = _read_u32(data);
+		data += 4;
+
+		out->speedrun_time.splits = malloc(out->speedrun_time.nsplits * sizeof out->speedrun_time.splits[0]);
+
+		for (size_t i = 0; i < out->speedrun_time.nsplits; ++i) {
+			out->speedrun_time.splits[i].name = strdup((char *)data);
+			data += strlen(out->speedrun_time.splits[i].name) + 1;
+
+			out->speedrun_time.splits[i].nsegs = _read_u32(data);
+			data += 4;
+
+			out->speedrun_time.splits[i].segs = malloc(out->speedrun_time.splits[i].nsegs * sizeof out->speedrun_time.splits[i].segs[0]);
+
+			for (size_t j = 0; j < out->speedrun_time.splits[i].nsegs; ++j) {
+				out->speedrun_time.splits[i].segs[j].name = strdup((char *)data);
+				data += strlen(out->speedrun_time.splits[i].segs[j].name) + 1;
+
+				out->speedrun_time.splits[i].segs[j].ticks = _read_u32(data);
+				data += 4;
+			}
+		}
+
+		if (data != data_orig + len - 1) out->type = SAR_DATA_INVALID;
+
+		break;
 
 	default:
 		out->type = SAR_DATA_INVALID;
-		return 0;
+		break;
 	}
+
+	free(data_orig);
+	return 0;
 }
 
 // }}}
@@ -417,12 +481,15 @@ struct demo *demo_parse(const char *path) {
 		struct demo_msg *msg = _parse_msg(f);
 		if (!msg) {
 			fprintf(g_errfile, "%s: malformed demo message at offset %ld %ld\n", path, ftell(f), p);
+			fputs("THE FOLLOWING DEMO IS CORRUPTED. PARSING AS MUCH AS POSSIBLE\n", g_outfile);
+			/*
 			for (size_t i = 0; i < msg_count; ++i) {
 				_msg_free(msgs[i]);
 			}
 			free(msgs);
 			fclose(f);
-			return NULL;
+			return NULL;*/
+			break;
 		}
 
 		if (msg_count == msg_alloc) {

@@ -1,8 +1,10 @@
 obj
 mdp
+mdp.exe
 *.dem
 cmd_whitelist.txt
 sar_whitelist.txt
+expected_maps.txt
 errors.txt
 output.txt
 demos/

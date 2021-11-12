@@ -24,6 +24,8 @@ struct sar_data {
 		SAR_DATA_CHALLENGE_FLAGS = 0x06,
 		SAR_DATA_CROUCH_FLY = 0x07,
 		SAR_DATA_PAUSE = 0x08,
+		SAR_DATA_WAIT_RUN = 0x09,
+		SAR_DATA_SPEEDRUN_TIME = 0x0A,
 		SAR_DATA_CHECKSUM = 0xFF,
 
 		SAR_DATA_INVALID,
@@ -56,6 +58,23 @@ struct sar_data {
 			float x, y, z;
 			bool orange;
 		} portal_placement;
+
+		struct {
+			int tick;
+			char *cmd;
+		} wait_run;
+
+		struct {
+			size_t nsplits;
+			struct {
+				char *name;
+				size_t nsegs;
+				struct {
+					char *name;
+					int ticks;
+				} *segs;
+			} *splits;
+		} speedrun_time;
 	};
 };
 

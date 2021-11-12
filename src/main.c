@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 
 #include "common.h"
 #include "config.h"
@@ -57,11 +58,15 @@ static void _output_sar_data(uint32_t tick, struct sar_data data) {
 			++_g_num_timescale;
 			_g_detected_timescale = true;
 		}
+#ifdef SHOW_ANTICHEAT
 		fprintf(g_outfile, "\t\t[%5u] [SAR] timescale %.2f\n", tick, data.timescale);
+#endif
 		break;
 	case SAR_DATA_INITIAL_CVAR:
 		if (!_allow_initial_cvar(data.initial_cvar.cvar, data.initial_cvar.val)) {
+#ifdef SHOW_ANTICHEAT
 			fprintf(g_outfile, "\t\t[%5u] [SAR] cvar '%s' = '%s'\n", tick, data.initial_cvar.cvar, data.initial_cvar.val);
+#endif
 		}
 		break;
 	case SAR_DATA_PAUSE:
@@ -69,6 +74,34 @@ static void _output_sar_data(uint32_t tick, struct sar_data data) {
 		break;
 	case SAR_DATA_INVALID:
 		fprintf(g_outfile, "\t\t[%5u] [SAR] corrupt data!\n", tick);
+		break;
+	case SAR_DATA_WAIT_RUN:
+		fprintf(g_outfile, "\t\t[%5u] [SAR] wait to %d for '%s'\n", tick, data.wait_run.tick, data.wait_run.cmd);
+		break;
+	case SAR_DATA_SPEEDRUN_TIME:
+		fprintf(g_outfile, "\t\t[%5u] [SAR] Speedrun finished with %zu splits!\n", tick, data.speedrun_time.nsplits);
+		{
+			size_t ticks = 0;
+			for (size_t i = 0; i < data.speedrun_time.nsplits; ++i) {
+				fprintf(g_outfile, "\t\t\t%s (%zu segments):\n", data.speedrun_time.splits[i].name, data.speedrun_time.splits[i].nsegs);
+				for (size_t j = 0; j < data.speedrun_time.splits[i].nsegs; ++j) {
+					fprintf(g_outfile, "\t\t\t\t%s (%d ticks)\n", data.speedrun_time.splits[i].segs[j].name, data.speedrun_time.splits[i].segs[j].ticks);
+					ticks += data.speedrun_time.splits[i].segs[j].ticks;
+				}
+			}
+
+			size_t total = roundf((float)(ticks * 1000) / 60.0f);
+
+			int ms = total % 1000;
+			total /= 1000;
+			int secs = total % 60;
+			total /= 60;
+			int mins = total % 60;
+			total /= 60;
+			int hrs = total;
+
+			fprintf(g_outfile, "\t\t\tTotal: %zu ticks = %d:%02d:%02d.%03d\n", ticks, hrs, mins, secs, ms);
+		}
 		break;
 	default:
 		// don't care
@@ -92,6 +125,7 @@ static void _output_msg(struct demo_msg *msg) {
 }
 
 static void _validate_checksum(uint32_t demo_given, uint32_t sar_given, uint32_t demo_real) {
+#ifdef SHOW_ANTICHEAT
 	bool demo_matches = demo_given == demo_real;
 	if (demo_matches) {
 		//fprintf(g_outfile, "\tdemo checksum PASS (%X)\n", demo_real);
@@ -104,6 +138,7 @@ static void _validate_checksum(uint32_t demo_given, uint32_t sar_given, uint32_t
 	} else {
 		fprintf(g_outfile, "\tSAR checksum FAIL (%X)\n", sar_given);
 	}
+#endif
 }
 
 void run_demo(const char *path) {
@@ -141,7 +176,9 @@ void run_demo(const char *path) {
 	}
 
 	if (!has_csum) {
+#ifdef SHOW_ANTICHEAT
 		fputs("\tno checksums found; vanilla demo?\n", g_outfile);
+#endif
 	}
 
 	demo_free(demo);
@@ -184,7 +221,9 @@ int main(void) {
 		fprintf(g_errfile, "failed to open demos folder '%s'\n", DEMO_DIR);
 	}
 
+#ifdef SHOW_ANTICHEAT
 	fprintf(g_outfile, "\ntimescale detected on %u demos\n", _g_num_timescale);
+#endif
 
 	if (_g_expected_maps) {
 		bool did_hdr = false;
