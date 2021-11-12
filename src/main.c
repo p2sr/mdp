@@ -19,7 +19,9 @@ FILE *g_errfile;
 FILE *g_outfile;
 
 static char **g_cmd_whitelist;
+#ifdef SHOW_ANTICHEAT
 static char **g_sar_sum_whitelist;
+#endif
 
 static bool _allow_initial_cvar(const char *var, const char *val) {
 #define ALLOW(x, y) if (!strcmp(var, #x) && !strcmp(val, y)) return true
@@ -190,7 +192,9 @@ int main(void) {
 
 	_g_expected_maps = (const char **)config_read_newline_sep(EXPECTED_MAPS_FILE);
 	g_cmd_whitelist = config_read_newline_sep(CMD_WHITELIST_FILE);
+#ifdef SHOW_ANTICHEAT
 	g_sar_sum_whitelist = config_read_newline_sep(SAR_WHITELIST_FILE);
+#endif
 
 	DIR *d = opendir(DEMO_DIR);
 	if (d) {
@@ -238,7 +242,9 @@ int main(void) {
 	}
 
 	config_free_newline_sep(g_cmd_whitelist);
+#ifdef SHOW_ANTICHEAT
 	config_free_newline_sep(g_sar_sum_whitelist);
+#endif
 
 	fclose(g_errfile);
 	fclose(g_outfile);
