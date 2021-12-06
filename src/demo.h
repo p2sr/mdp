@@ -26,6 +26,7 @@ struct sar_data {
 		SAR_DATA_PAUSE = 0x08,
 		SAR_DATA_WAIT_RUN = 0x09,
 		SAR_DATA_SPEEDRUN_TIME = 0x0A,
+		SAR_DATA_TIMESTAMP = 0x0B,
 		SAR_DATA_CHECKSUM = 0xFF,
 
 		SAR_DATA_INVALID,
@@ -75,6 +76,15 @@ struct sar_data {
 				} *segs;
 			} *splits;
 		} speedrun_time;
+
+		struct {
+			uint16_t year;
+			uint8_t mon;
+			uint8_t day;
+			uint8_t hour;
+			uint8_t min;
+			uint8_t sec;
+		} timestamp;
 	};
 };
 

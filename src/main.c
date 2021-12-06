@@ -105,6 +105,19 @@ static void _output_sar_data(uint32_t tick, struct sar_data data) {
 			fprintf(g_outfile, "\t\t\tTotal: %zu ticks = %d:%02d:%02d.%03d\n", ticks, hrs, mins, secs, ms);
 		}
 		break;
+	case SAR_DATA_TIMESTAMP:
+		fprintf(
+			g_outfile,
+			"\t\t[%5u] [SAR] recorded at %04d/%02d/%02d %02d:%02d:%02d UTC\n",
+			tick,
+			(int)data.timestamp.year,
+			(int)data.timestamp.mon,
+			(int)data.timestamp.day,
+			(int)data.timestamp.hour,
+			(int)data.timestamp.min,
+			(int)data.timestamp.sec
+		);
+		break;
 	default:
 		// don't care
 		break;
