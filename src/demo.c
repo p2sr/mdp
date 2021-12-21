@@ -32,6 +32,10 @@ static inline void _sar_data_free(struct sar_data data) {
 		free(data.wait_run.cmd);
 		break;
 
+	case SAR_DATA_HWAIT_RUN:
+		free(data.hwait_run.cmd);
+		break;
+
 	case SAR_DATA_SPEEDRUN_TIME:
 		for (size_t i = 0; i < data.speedrun_time.nsplits; ++i) {
 			for (size_t j = 0; j < data.speedrun_time.splits[i].nsegs; ++j) {
@@ -41,6 +45,10 @@ static inline void _sar_data_free(struct sar_data data) {
 			free(data.speedrun_time.splits[i].segs);
 		}
 		free(data.speedrun_time.splits);
+		break;
+
+	case SAR_DATA_FILE_CHECKSUM:
+		free(data.file_checksum.path);
 		break;
 
 	default:
@@ -204,6 +212,17 @@ static int _parse_sar_data(struct sar_data *out, FILE *f, size_t len) {
 
 		break;
 
+	case SAR_DATA_HWAIT_RUN:
+		if (len < 6) {
+			out->type = SAR_DATA_INVALID;
+			break;
+		}
+
+		out->hwait_run.ticks = _read_u32(data);
+		out->hwait_run.cmd = strdup((char *)data + 4);
+
+		break;
+
 	case SAR_DATA_SPEEDRUN_TIME:
 		if (len < 5) {
 			out->type = SAR_DATA_INVALID;
@@ -249,6 +268,17 @@ static int _parse_sar_data(struct sar_data *out, FILE *f, size_t len) {
 		out->timestamp.hour = data[4];
 		out->timestamp.min = data[5];
 		out->timestamp.sec = data[6];
+
+		break;
+
+	case SAR_DATA_FILE_CHECKSUM:
+		if (len < 6) {
+			out->type = SAR_DATA_INVALID;
+			break;
+		}
+
+		out->file_checksum.sum = _read_u32(data);
+		out->file_checksum.path = strdup((char *)(data + 4));
 
 		break;
 

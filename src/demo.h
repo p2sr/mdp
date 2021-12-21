@@ -27,6 +27,8 @@ struct sar_data {
 		SAR_DATA_WAIT_RUN = 0x09,
 		SAR_DATA_SPEEDRUN_TIME = 0x0A,
 		SAR_DATA_TIMESTAMP = 0x0B,
+		SAR_DATA_FILE_CHECKSUM = 0x0C,
+		SAR_DATA_HWAIT_RUN = 0x0D,
 		SAR_DATA_CHECKSUM = 0xFF,
 
 		SAR_DATA_INVALID,
@@ -66,6 +68,11 @@ struct sar_data {
 		} wait_run;
 
 		struct {
+			int ticks;
+			char *cmd;
+		} hwait_run;
+
+		struct {
 			size_t nsplits;
 			struct {
 				char *name;
@@ -85,6 +92,11 @@ struct sar_data {
 			uint8_t min;
 			uint8_t sec;
 		} timestamp;
+
+		struct {
+			char *path;
+			uint32_t sum;
+		} file_checksum;
 	};
 };
 

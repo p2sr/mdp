@@ -80,6 +80,9 @@ static void _output_sar_data(uint32_t tick, struct sar_data data) {
 	case SAR_DATA_WAIT_RUN:
 		fprintf(g_outfile, "\t\t[%5u] [SAR] wait to %d for '%s'\n", tick, data.wait_run.tick, data.wait_run.cmd);
 		break;
+	case SAR_DATA_HWAIT_RUN:
+		fprintf(g_outfile, "\t\t[%5u] [SAR] hwait %d ticks for '%s'\n", tick, data.hwait_run.ticks, data.hwait_run.cmd);
+		break;
 	case SAR_DATA_SPEEDRUN_TIME:
 		fprintf(g_outfile, "\t\t[%5u] [SAR] Speedrun finished with %zu splits!\n", tick, data.speedrun_time.nsplits);
 		{
@@ -117,6 +120,11 @@ static void _output_sar_data(uint32_t tick, struct sar_data data) {
 			(int)data.timestamp.min,
 			(int)data.timestamp.sec
 		);
+		break;
+	case SAR_DATA_FILE_CHECKSUM:
+#ifdef SHOW_ANTICHEAT
+		//fprintf(g_outfile, "\t\t[%5u] [SAR] file \"%s\" has checksum %08X\n", tick, data.file_checksum.path, data.file_checksum.sum);
+#endif
 		break;
 	default:
 		// don't care
