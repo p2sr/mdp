@@ -263,7 +263,7 @@ static int _parse_sar_data(struct sar_data *out, FILE *f, size_t len) {
 		}
 
 		out->timestamp.year = data[0] | (data[1] << 8);
-		out->timestamp.mon = data[2];
+		out->timestamp.mon = data[2] + 1; // month off-by-one lol
 		out->timestamp.day = data[3];
 		out->timestamp.hour = data[4];
 		out->timestamp.min = data[5];
