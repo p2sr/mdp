@@ -14,6 +14,8 @@
 #define EXPECTED_MAPS_FILE "expected_maps.txt"
 #define CMD_WHITELIST_FILE "cmd_whitelist.txt"
 #define SAR_WHITELIST_FILE "sar_whitelist.txt"
+#define CVAR_WHITELIST_FILE "cvar_whitelist.txt"
+#define FILESUM_WHITELIST_FILE "filesum_whitelist.txt"
 
 FILE *g_errfile;
 FILE *g_outfile;
@@ -21,6 +23,8 @@ FILE *g_outfile;
 static char **g_cmd_whitelist;
 #ifdef SHOW_ANTICHEAT
 static char **g_sar_sum_whitelist;
+static struct var_whitelist *g_filesum_whitelist;
+static struct var_whitelist *g_cvar_whitelist;
 #endif
 
 static bool _allow_initial_cvar(const char *var, const char *val) {
@@ -46,6 +50,22 @@ static bool _allow_initial_cvar(const char *var, const char *val) {
 #undef ALLOWRANGE
 }
 
+static bool _ignore_filesum(const char *path) {
+	// hack to deal with the fact that older sar versions included way
+	// more filesums than now
+	size_t len = strlen(path);
+	const char *end = path + len;
+	if (len > 3 && !strcasecmp(end - 3, ".so")) return true;
+	if (len > 4 && !strcasecmp(end - 4, ".dll")) return true;
+	if (len > 4 && !strcasecmp(end - 4, ".bsp")) return true;
+	if (len > 4 && !strcasecmp(end - 4, ".vpk")) {
+		if (!strncmp(path, "./portal2_dlc3/", 15)) return false;
+		if (!strncmp(path, "portal2_dlc3/", 13)) return false;
+		return true;
+	}
+	return false;
+}
+
 // janky hack lol
 static const char *const _g_map_found = "_MAP_FOUND";
 static const char **_g_expected_maps;
@@ -65,11 +85,13 @@ static void _output_sar_data(uint32_t tick, struct sar_data data) {
 #endif
 		break;
 	case SAR_DATA_INITIAL_CVAR:
-		if (!_allow_initial_cvar(data.initial_cvar.cvar, data.initial_cvar.val)) {
 #ifdef SHOW_ANTICHEAT
+		if (!_allow_initial_cvar(data.initial_cvar.cvar, data.initial_cvar.val) && !config_check_var_whitelist(g_cvar_whitelist, data.initial_cvar.cvar, data.initial_cvar.val)) {
 			fprintf(g_outfile, "\t\t[%5u] [SAR] cvar '%s' = '%s'\n", tick, data.initial_cvar.cvar, data.initial_cvar.val);
-#endif
 		}
+#else
+		(void)_allow_initial_cvar; // suppress warnings
+#endif
 		break;
 	case SAR_DATA_PAUSE:
 		fprintf(g_outfile, "\t\t[%5u] [SAR] paused for %d ticks (%.2fs)\n", tick, data.pause_ticks, (float)data.pause_ticks / 60.0f);
@@ -123,7 +145,15 @@ static void _output_sar_data(uint32_t tick, struct sar_data data) {
 		break;
 	case SAR_DATA_FILE_CHECKSUM:
 #ifdef SHOW_ANTICHEAT
-		//fprintf(g_outfile, "\t\t[%5u] [SAR] file \"%s\" has checksum %08X\n", tick, data.file_checksum.path, data.file_checksum.sum);
+		{
+			char strbuf[9];
+			snprintf(strbuf, sizeof strbuf, "%08X", data.file_checksum.sum);
+			if (!_ignore_filesum(data.file_checksum.path) && !config_check_var_whitelist(g_filesum_whitelist, data.file_checksum.path, strbuf)) {
+				fprintf(g_outfile, "\t\t[%5u] [SAR] file \"%s\" has checksum %08X\n", tick, data.file_checksum.path, data.file_checksum.sum);
+			}
+		}
+#else
+		(void)_ignore_filesum; // suppress warnings
 #endif
 		break;
 	default:
@@ -215,6 +245,8 @@ int main(void) {
 	g_cmd_whitelist = config_read_newline_sep(CMD_WHITELIST_FILE);
 #ifdef SHOW_ANTICHEAT
 	g_sar_sum_whitelist = config_read_newline_sep(SAR_WHITELIST_FILE);
+	g_filesum_whitelist = config_read_var_whitelist(FILESUM_WHITELIST_FILE);
+	g_cvar_whitelist = config_read_var_whitelist(CVAR_WHITELIST_FILE);
 #endif
 
 	DIR *d = opendir(DEMO_DIR);
@@ -265,6 +297,8 @@ int main(void) {
 	config_free_newline_sep(g_cmd_whitelist);
 #ifdef SHOW_ANTICHEAT
 	config_free_newline_sep(g_sar_sum_whitelist);
+	config_free_var_whitelist(g_filesum_whitelist);
+	config_free_var_whitelist(g_cvar_whitelist);
 #endif
 
 	fclose(g_errfile);

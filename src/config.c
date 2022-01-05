@@ -1,3 +1,4 @@
+#include <ctype.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -89,4 +90,88 @@ void config_free_newline_sep(char **lines) {
 		++ptr;
 	}
 	free(lines);
+}
+
+struct var_whitelist *config_read_var_whitelist(const char *path) {
+	FILE *f = fopen(path, "r");
+	if (!f) {
+		fprintf(g_errfile, "%s: failed to open file\n", path);
+		return NULL;
+	}
+
+	size_t entry_alloc = 32;
+	size_t entry_count = 0;
+	struct var_whitelist *list = malloc(entry_alloc * sizeof list[0]);
+
+	while (1) {
+		char *line = malloc(256); // lines won't reasonably be longer than this
+
+		if (!fgets(line, 256, f)) {
+			free(line);
+			break;
+		}
+
+		if (strlen(line) == 255) {
+			fprintf(g_errfile, "%s: line %zu too long\n", path, entry_count + 1);
+			free(line);
+			for (size_t i = 0; i < entry_count; ++i) {
+				free(list[i].var_name);
+			}
+			free(list);
+			return NULL;
+		}
+
+		util_strip_whitespace(line);
+
+		// ignore blank lines
+		if (strlen(line) == 0) {
+			free(line);
+			continue;
+		}
+
+		// find whitespace to split on
+		char *split = line;
+		while (*split && !isspace(*split)) ++split;
+		if (*split) {
+			// just zero out that byte, then go to the next non-whitespace one
+			*split = 0;
+			++split;
+			while (isspace(*split)) ++split;
+		}
+
+		list[entry_count++] = (struct var_whitelist){ line, *split ? split : NULL };
+
+		if (entry_count == entry_alloc) {
+			entry_alloc *= 2;
+			list = realloc(list, entry_alloc * sizeof list[0]);
+		}
+	}
+
+	list[entry_count] = (struct var_whitelist){ NULL, NULL };
+
+	fclose(f);
+
+	return list;
+}
+
+bool config_check_var_whitelist(struct var_whitelist *list, const char *var, const char *val) {
+	if (!list) return false;
+	while (list->var_name) {
+		if (!strcmp(list->var_name, var)) {
+			if (!list->val) return true;
+			if (!strcmp(list->val, val)) return true;
+		}
+		++list;
+	}
+	return false;
+}
+
+void config_free_var_whitelist(struct var_whitelist *list) {
+	if (!list) return;
+	struct var_whitelist *list1 = list;
+	while (list1->var_name) {
+		free(list1->var_name);
+		++list1;
+	}
+	free(list);
 }
