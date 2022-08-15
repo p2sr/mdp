@@ -9,8 +9,16 @@
 #include "crc_table.h"
 #include "demo.h"
 #include "util.h"
+#include "ed25519/ed25519.h"
 
 #define HDR_SIZE 1072
+
+static unsigned char _g_demo_sign_pubkey[32] = {
+	0xF5, 0x84, 0x77, 0x86, 0x98, 0x45, 0x91, 0xA8,
+	0x4E, 0x6E, 0x51, 0x1F, 0x34, 0xDF, 0x59, 0x81,
+	0x76, 0x81, 0xF7, 0x0E, 0x95, 0x7B, 0x31, 0xD9,
+	0xD8, 0x0E, 0x79, 0xD0, 0x5F, 0xDB, 0x9B, 0x19,
+};
 
 // Freeing {{{
 
@@ -165,6 +173,17 @@ static int _parse_sar_data(struct sar_data *out, FILE *f, size_t len) {
 
 		out->checksum.demo_sum = _read_u32(data);
 		out->checksum.sar_sum = _read_u32(data + 4);
+
+		break;
+
+	case SAR_DATA_CHECKSUM_V2:
+		if (len != 69) {
+			out->type = SAR_DATA_INVALID;
+			break;
+		}
+
+		out->checksum_v2.sar_sum = _read_u32(data);
+		memcpy(out->checksum_v2.signature, data + 4, 64);
 
 		break;
 
@@ -459,6 +478,35 @@ static uint32_t _demo_checksum(FILE *f) {
 
 // }}}
 
+// _demo_verify_sig {{{
+
+static bool _demo_verify_sig(FILE *f, uint32_t sar_sum, const unsigned char *signature) {
+	if (fseek(f, -91, SEEK_END)) return false; // ignore checksum message
+
+	size_t size = ftell(f);
+	if (size == -1) return false;
+
+	if (fseek(f, 0, SEEK_SET)) return false;
+
+	char *buf = malloc(size + 4); // extra space for sar checksum
+	fread(buf, 1, size, f);
+	if (ferror(f)) {
+		free(buf);
+		return false;
+	}
+
+	// write sar checksum to end
+	*(uint32_t *)(buf + size) = sar_sum;
+
+	bool res = ed25519_verify(signature, (unsigned char *)buf, size + 4, _g_demo_sign_pubkey);
+
+	free(buf);
+
+	return res;
+}
+
+// }}}
+
 // demo_parse {{{
 
 struct demo *demo_parse(const char *path) {
@@ -550,12 +598,18 @@ struct demo *demo_parse(const char *path) {
 	// Checksum {{{
 
 	uint32_t checksum = 0;
+	bool v2sum_present = false;
+	bool v2sum_valid = false;
 
 	if (msg_count > 0) {
 		struct demo_msg *last = msgs[msg_count - 1];
 		if (last->type == DEMO_MSG_SAR_DATA && last->sar_data.type == SAR_DATA_CHECKSUM) {
 			// There's a SAR checksum message - calculate the demo checksum
 			checksum = _demo_checksum(f);
+		} else if (last->type == DEMO_MSG_SAR_DATA && last->sar_data.type == SAR_DATA_CHECKSUM_V2) {
+			// v2 checksum - extract SAR checksum and verify signature
+			v2sum_present = true;
+			v2sum_valid = _demo_verify_sig(f, last->sar_data.checksum_v2.sar_sum, last->sar_data.checksum_v2.signature);
 		}
 	}
 
@@ -568,6 +622,7 @@ struct demo *demo_parse(const char *path) {
 	demo->nmsgs = msg_count;
 	demo->msgs = msgs;
 	demo->checksum = checksum;
+	demo->v2sum_state = v2sum_present ? (v2sum_valid ? V2SUM_VALID : V2SUM_INVALID) : V2SUM_NONE;
 
 	return demo;
 }

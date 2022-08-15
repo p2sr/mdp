@@ -30,6 +30,7 @@ struct sar_data {
 		SAR_DATA_FILE_CHECKSUM = 0x0C,
 		SAR_DATA_HWAIT_RUN = 0x0D,
 		SAR_DATA_CHECKSUM = 0xFF,
+		SAR_DATA_CHECKSUM_V2 = 0xFE,
 
 		SAR_DATA_INVALID,
 	} type;
@@ -49,6 +50,11 @@ struct sar_data {
 			uint32_t demo_sum;
 			uint32_t sar_sum;
 		} checksum;
+
+		struct {
+			uint32_t sar_sum;
+			unsigned char signature[64];
+		} checksum_v2;
 
 		struct {
 			char *targetname;
@@ -132,6 +138,11 @@ struct demo {
 	size_t nmsgs;
 	struct demo_msg **msgs;
 	uint32_t checksum;
+	enum {
+		V2SUM_NONE,
+		V2SUM_INVALID,
+		V2SUM_VALID,
+	} v2sum_state;
 };
 
 struct demo *demo_parse(const char *path);

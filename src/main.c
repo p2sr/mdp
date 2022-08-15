@@ -219,6 +219,21 @@ void run_demo(const char *path) {
 		}
 	}
 
+#ifdef SHOW_ANTICHEAT
+	if (demo->v2sum_state == V2SUM_INVALID) {
+		fprintf(g_outfile, "\tdemo v2 checksum FAIL\n");
+	} else if (demo->v2sum_state == V2SUM_VALID) {
+		//fprintf(g_outfile, "\tdemo v2 checksum PASS\n");
+		struct demo_msg *msg = demo->msgs[demo->nmsgs - 1];
+		uint32_t sar_sum = msg->sar_data.checksum_v2.sar_sum;
+		if (config_check_sum_whitelist(g_sar_sum_whitelist, sar_sum)) {
+			//fprintf(g_outfile, "\tSAR checksum PASS (%X)\n", sar_sum);
+		} else {
+			fprintf(g_outfile, "\tSAR checksum FAIL (%X)\n", sar_sum);
+		}
+	}
+#endif
+
 	if (_g_expected_maps) {
 		for (size_t i = 0; _g_expected_maps[i]; ++i) {
 			if (_g_expected_maps[i] == _g_map_found) continue; // This pointer equality check is intentional
@@ -228,7 +243,7 @@ void run_demo(const char *path) {
 		}
 	}
 
-	if (!has_csum) {
+	if (!has_csum && demo->v2sum_state == V2SUM_NONE) {
 #ifdef SHOW_ANTICHEAT
 		fputs("\tno checksums found; vanilla demo?\n", g_outfile);
 #endif
