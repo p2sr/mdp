@@ -154,16 +154,18 @@ struct var_whitelist *config_read_var_whitelist(const char *path) {
 	return list;
 }
 
-bool config_check_var_whitelist(struct var_whitelist *list, const char *var, const char *val) {
+int config_check_var_whitelist(struct var_whitelist *list, const char *var, const char *val) {
 	if (!list) return false;
+	bool found = false;
 	while (list->var_name) {
 		if (!strcmp(list->var_name, var)) {
-			if (!list->val) return true;
-			if (!strcmp(list->val, val)) return true;
+			found = true;
+			if (!list->val) return 2; // matching
+			if (!strcmp(list->val, val)) return 2; // matching
 		}
 		++list;
 	}
-	return false;
+	return found ? 1 : 0;
 }
 
 void config_free_var_whitelist(struct var_whitelist *list) {

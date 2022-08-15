@@ -16,6 +16,7 @@
 #define SAR_WHITELIST_FILE "sar_whitelist.txt"
 #define CVAR_WHITELIST_FILE "cvar_whitelist.txt"
 #define FILESUM_WHITELIST_FILE "filesum_whitelist.txt"
+#define GENERAL_CONF_FILE "config.txt"
 
 FILE *g_errfile;
 FILE *g_outfile;
@@ -26,6 +27,16 @@ static char **g_sar_sum_whitelist;
 static struct var_whitelist *g_filesum_whitelist;
 static struct var_whitelist *g_cvar_whitelist;
 #endif
+
+// general config options
+struct {
+#ifdef SHOW_ANTICHEAT
+	int file_sum_mode; // 0 = don't show, 1 = show not matching, 2 (default) = show not matching or not present
+	int initial_cvar_mode; // 0 = don't show, 1 = show not matching, 2 (default) = show not matching or not present
+	bool show_passing_checksums; // should we output successful checksums?
+#endif
+	bool show_wait; // should we show when 'wait' was run?
+} g_config;
 
 static bool _allow_initial_cvar(const char *var, const char *val) {
 #define ALLOW(x, y) if (!strcmp(var, #x) && !strcmp(val, y)) return true
@@ -86,8 +97,11 @@ static void _output_sar_data(uint32_t tick, struct sar_data data) {
 		break;
 	case SAR_DATA_INITIAL_CVAR:
 #ifdef SHOW_ANTICHEAT
-		if (!_allow_initial_cvar(data.initial_cvar.cvar, data.initial_cvar.val) && !config_check_var_whitelist(g_cvar_whitelist, data.initial_cvar.cvar, data.initial_cvar.val)) {
-			fprintf(g_outfile, "\t\t[%5u] [SAR] cvar '%s' = '%s'\n", tick, data.initial_cvar.cvar, data.initial_cvar.val);
+		if (g_config.initial_cvar_mode != 0) {
+			int whitelist_status = config_check_var_whitelist(g_cvar_whitelist, data.initial_cvar.cvar, data.initial_cvar.val);
+			if (!_allow_initial_cvar(data.initial_cvar.cvar, data.initial_cvar.val) && (whitelist_status == 1 || (whitelist_status == 0 && g_config.initial_cvar_mode == 2))) {
+				fprintf(g_outfile, "\t\t[%5u] [SAR] cvar '%s' = '%s'\n", tick, data.initial_cvar.cvar, data.initial_cvar.val);
+			}
 		}
 #else
 		(void)_allow_initial_cvar; // suppress warnings
@@ -100,10 +114,10 @@ static void _output_sar_data(uint32_t tick, struct sar_data data) {
 		fprintf(g_outfile, "\t\t[%5u] [SAR] corrupt data!\n", tick);
 		break;
 	case SAR_DATA_WAIT_RUN:
-		fprintf(g_outfile, "\t\t[%5u] [SAR] wait to %d for '%s'\n", tick, data.wait_run.tick, data.wait_run.cmd);
+		if (g_config.show_wait) fprintf(g_outfile, "\t\t[%5u] [SAR] wait to %d for '%s'\n", tick, data.wait_run.tick, data.wait_run.cmd);
 		break;
 	case SAR_DATA_HWAIT_RUN:
-		fprintf(g_outfile, "\t\t[%5u] [SAR] hwait %d ticks for '%s'\n", tick, data.hwait_run.ticks, data.hwait_run.cmd);
+		if (g_config.show_wait) fprintf(g_outfile, "\t\t[%5u] [SAR] hwait %d ticks for '%s'\n", tick, data.hwait_run.ticks, data.hwait_run.cmd);
 		break;
 	case SAR_DATA_SPEEDRUN_TIME:
 		fprintf(g_outfile, "\t\t[%5u] [SAR] Speedrun finished with %zu splits!\n", tick, data.speedrun_time.nsplits);
@@ -145,10 +159,11 @@ static void _output_sar_data(uint32_t tick, struct sar_data data) {
 		break;
 	case SAR_DATA_FILE_CHECKSUM:
 #ifdef SHOW_ANTICHEAT
-		{
+		if (g_config.file_sum_mode != 0) {
 			char strbuf[9];
 			snprintf(strbuf, sizeof strbuf, "%08X", data.file_checksum.sum);
-			if (!_ignore_filesum(data.file_checksum.path) && !config_check_var_whitelist(g_filesum_whitelist, data.file_checksum.path, strbuf)) {
+			int whitelist_status = config_check_var_whitelist(g_filesum_whitelist, data.file_checksum.path, strbuf);
+			if (!_ignore_filesum(data.file_checksum.path) && (whitelist_status == 1 || (whitelist_status == 0 && g_config.file_sum_mode == 2))) {
 				fprintf(g_outfile, "\t\t[%5u] [SAR] file \"%s\" has checksum %08X\n", tick, data.file_checksum.path, data.file_checksum.sum);
 			}
 		}
@@ -181,13 +196,13 @@ static void _validate_checksum(uint32_t demo_given, uint32_t sar_given, uint32_t
 #ifdef SHOW_ANTICHEAT
 	bool demo_matches = demo_given == demo_real;
 	if (demo_matches) {
-		//fprintf(g_outfile, "\tdemo checksum PASS (%X)\n", demo_real);
+		if (g_config.show_passing_checksums) fprintf(g_outfile, "\tdemo checksum PASS (%X)\n", demo_real);
 	} else {
 		fprintf(g_outfile, "\tdemo checksum FAIL (%X; should be %X)\n", demo_given, demo_real);
 	}
 
 	if (config_check_sum_whitelist(g_sar_sum_whitelist, sar_given)) {
-		//fprintf(g_outfile, "\tSAR checksum PASS (%X)\n", sar_given);
+		if (g_config.show_passing_checksums) fprintf(g_outfile, "\tSAR checksum PASS (%X)\n", sar_given);
 	} else {
 		fprintf(g_outfile, "\tSAR checksum FAIL (%X)\n", sar_given);
 	}
@@ -223,11 +238,11 @@ void run_demo(const char *path) {
 	if (demo->v2sum_state == V2SUM_INVALID) {
 		fprintf(g_outfile, "\tdemo v2 checksum FAIL\n");
 	} else if (demo->v2sum_state == V2SUM_VALID) {
-		//fprintf(g_outfile, "\tdemo v2 checksum PASS\n");
+		if (g_config.show_passing_checksums) fprintf(g_outfile, "\tdemo v2 checksum PASS\n");
 		struct demo_msg *msg = demo->msgs[demo->nmsgs - 1];
 		uint32_t sar_sum = msg->sar_data.checksum_v2.sar_sum;
 		if (config_check_sum_whitelist(g_sar_sum_whitelist, sar_sum)) {
-			//fprintf(g_outfile, "\tSAR checksum PASS (%X)\n", sar_sum);
+			if (g_config.show_passing_checksums) fprintf(g_outfile, "\tSAR checksum PASS (%X)\n", sar_sum);
 		} else {
 			fprintf(g_outfile, "\tSAR checksum FAIL (%X)\n", sar_sum);
 		}
@@ -263,6 +278,50 @@ int main(void) {
 	g_filesum_whitelist = config_read_var_whitelist(FILESUM_WHITELIST_FILE);
 	g_cvar_whitelist = config_read_var_whitelist(CVAR_WHITELIST_FILE);
 #endif
+
+#ifdef SHOW_ANTICHEAT
+	g_config.file_sum_mode = 2;
+	g_config.initial_cvar_mode = 2;
+	g_config.show_passing_checksums = false;
+#endif
+	g_config.show_wait = true;
+	struct var_whitelist *general_conf = config_read_var_whitelist(GENERAL_CONF_FILE);
+	if (general_conf) {
+		for (struct var_whitelist *ptr = general_conf; ptr->var_name; ++ptr) {
+#ifdef SHOW_ANTICHEAT
+			if (!strcmp(ptr->var_name, "file_sum_mode")) {
+				int val = atoi(ptr->val);
+				if (val < 0) val = 0;
+				if (val > 2) val = 2;
+				g_config.file_sum_mode = val;
+				continue;
+			}
+
+			if (!strcmp(ptr->var_name, "initial_cvar_mode")) {
+				int val = atoi(ptr->val);
+				if (val < 0) val = 0;
+				if (val > 2) val = 2;
+				g_config.initial_cvar_mode = val;
+				continue;
+			}
+
+			if (!strcmp(ptr->var_name, "show_passing_checksums")) {
+				int val = atoi(ptr->val);
+				g_config.show_passing_checksums = val != 0;
+				continue;
+			}
+#endif
+
+			if (!strcmp(ptr->var_name, "show_wait")) {
+				int val = atoi(ptr->val);
+				g_config.show_wait = val != 0;
+				continue;
+			}
+
+			fprintf(g_errfile, "bad config option '%s'\n", ptr->var_name);
+		}
+		config_free_var_whitelist(general_conf);
+	}
 
 	DIR *d = opendir(DEMO_DIR);
 	if (d) {

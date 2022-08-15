@@ -15,7 +15,8 @@ struct var_whitelist {
 };
 
 struct var_whitelist *config_read_var_whitelist(const char *path);
-bool config_check_var_whitelist(struct var_whitelist *list, const char *var, const char *val);
+// 0: not present, 1: present but not matching, 2: matching
+int config_check_var_whitelist(struct var_whitelist *list, const char *var, const char *val);
 void config_free_var_whitelist(struct var_whitelist *list);
 
 #endif
