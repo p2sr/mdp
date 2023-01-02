@@ -22,19 +22,15 @@ FILE *g_errfile;
 FILE *g_outfile;
 
 static char **g_cmd_whitelist;
-#ifdef SHOW_ANTICHEAT
 static char **g_sar_sum_whitelist;
 static struct var_whitelist *g_filesum_whitelist;
 static struct var_whitelist *g_cvar_whitelist;
-#endif
 
 // general config options
 struct {
-#ifdef SHOW_ANTICHEAT
 	int file_sum_mode; // 0 = don't show, 1 = show not matching, 2 (default) = show not matching or not present
 	int initial_cvar_mode; // 0 = don't show, 1 = show not matching, 2 (default) = show not matching or not present
 	bool show_passing_checksums; // should we output successful checksums?
-#endif
 	bool show_wait; // should we show when 'wait' was run?
 } g_config;
 
@@ -70,9 +66,10 @@ static bool _ignore_filesum(const char *path) {
 	if (len > 4 && !strcasecmp(end - 4, ".dll")) return true;
 	if (len > 4 && !strcasecmp(end - 4, ".bsp")) return true;
 	if (len > 4 && !strcasecmp(end - 4, ".vpk")) {
-		if (!strncmp(path, "./portal2_dlc3/", 15)) return false;
-		if (!strncmp(path, "portal2_dlc3/", 13)) return false;
-		return true;
+		if (!strncmp(path, "./portal2_dlc1/", 15)) return true;
+		if (!strncmp(path, "./portal2_dlc2/", 15)) return true;
+		if (!strncmp(path, "portal2_dlc1/", 13)) return true;
+		if (!strncmp(path, "portal2_dlc2/", 13)) return true;
 	}
 	return false;
 }
@@ -91,21 +88,15 @@ static void _output_sar_data(uint32_t tick, struct sar_data data) {
 			++_g_num_timescale;
 			_g_detected_timescale = true;
 		}
-#ifdef SHOW_ANTICHEAT
 		fprintf(g_outfile, "\t\t[%5u] [SAR] timescale %.2f\n", tick, data.timescale);
-#endif
 		break;
 	case SAR_DATA_INITIAL_CVAR:
-#ifdef SHOW_ANTICHEAT
 		if (g_config.initial_cvar_mode != 0) {
 			int whitelist_status = config_check_var_whitelist(g_cvar_whitelist, data.initial_cvar.cvar, data.initial_cvar.val);
 			if (!_allow_initial_cvar(data.initial_cvar.cvar, data.initial_cvar.val) && (whitelist_status == 1 || (whitelist_status == 0 && g_config.initial_cvar_mode == 2))) {
 				fprintf(g_outfile, "\t\t[%5u] [SAR] cvar '%s' = '%s'\n", tick, data.initial_cvar.cvar, data.initial_cvar.val);
 			}
 		}
-#else
-		(void)_allow_initial_cvar; // suppress warnings
-#endif
 		break;
 	case SAR_DATA_PAUSE:
 		fprintf(g_outfile, "\t\t[%5u] [SAR] paused for %d ticks (%.2fs)\n", tick, data.pause_ticks, (float)data.pause_ticks / 60.0f);
@@ -158,7 +149,6 @@ static void _output_sar_data(uint32_t tick, struct sar_data data) {
 		);
 		break;
 	case SAR_DATA_FILE_CHECKSUM:
-#ifdef SHOW_ANTICHEAT
 		if (g_config.file_sum_mode != 0) {
 			char strbuf[9];
 			snprintf(strbuf, sizeof strbuf, "%08X", data.file_checksum.sum);
@@ -167,9 +157,6 @@ static void _output_sar_data(uint32_t tick, struct sar_data data) {
 				fprintf(g_outfile, "\t\t[%5u] [SAR] file \"%s\" has checksum %08X\n", tick, data.file_checksum.path, data.file_checksum.sum);
 			}
 		}
-#else
-		(void)_ignore_filesum; // suppress warnings
-#endif
 		break;
 	default:
 		// don't care
@@ -193,7 +180,6 @@ static void _output_msg(struct demo_msg *msg) {
 }
 
 static void _validate_checksum(uint32_t demo_given, uint32_t sar_given, uint32_t demo_real) {
-#ifdef SHOW_ANTICHEAT
 	bool demo_matches = demo_given == demo_real;
 	if (demo_matches) {
 		if (g_config.show_passing_checksums) fprintf(g_outfile, "\tdemo checksum PASS (%X)\n", demo_real);
@@ -206,7 +192,6 @@ static void _validate_checksum(uint32_t demo_given, uint32_t sar_given, uint32_t
 	} else {
 		fprintf(g_outfile, "\tSAR checksum FAIL (%X)\n", sar_given);
 	}
-#endif
 }
 
 void run_demo(const char *path) {
@@ -234,7 +219,6 @@ void run_demo(const char *path) {
 		}
 	}
 
-#ifdef SHOW_ANTICHEAT
 	if (demo->v2sum_state == V2SUM_INVALID) {
 		fprintf(g_outfile, "\tdemo v2 checksum FAIL\n");
 	} else if (demo->v2sum_state == V2SUM_VALID) {
@@ -247,7 +231,6 @@ void run_demo(const char *path) {
 			fprintf(g_outfile, "\tSAR checksum FAIL (%X)\n", sar_sum);
 		}
 	}
-#endif
 
 	if (_g_expected_maps) {
 		for (size_t i = 0; _g_expected_maps[i]; ++i) {
@@ -259,9 +242,7 @@ void run_demo(const char *path) {
 	}
 
 	if (!has_csum && demo->v2sum_state == V2SUM_NONE) {
-#ifdef SHOW_ANTICHEAT
 		fputs("\tno checksums found; vanilla demo?\n", g_outfile);
-#endif
 	}
 
 	demo_free(demo);
@@ -273,22 +254,17 @@ int main(void) {
 
 	_g_expected_maps = (const char **)config_read_newline_sep(EXPECTED_MAPS_FILE);
 	g_cmd_whitelist = config_read_newline_sep(CMD_WHITELIST_FILE);
-#ifdef SHOW_ANTICHEAT
 	g_sar_sum_whitelist = config_read_newline_sep(SAR_WHITELIST_FILE);
 	g_filesum_whitelist = config_read_var_whitelist(FILESUM_WHITELIST_FILE);
 	g_cvar_whitelist = config_read_var_whitelist(CVAR_WHITELIST_FILE);
-#endif
 
-#ifdef SHOW_ANTICHEAT
 	g_config.file_sum_mode = 2;
 	g_config.initial_cvar_mode = 2;
 	g_config.show_passing_checksums = false;
-#endif
 	g_config.show_wait = true;
 	struct var_whitelist *general_conf = config_read_var_whitelist(GENERAL_CONF_FILE);
 	if (general_conf) {
 		for (struct var_whitelist *ptr = general_conf; ptr->var_name; ++ptr) {
-#ifdef SHOW_ANTICHEAT
 			if (!strcmp(ptr->var_name, "file_sum_mode")) {
 				int val = atoi(ptr->val);
 				if (val < 0) val = 0;
@@ -310,7 +286,6 @@ int main(void) {
 				g_config.show_passing_checksums = val != 0;
 				continue;
 			}
-#endif
 
 			if (!strcmp(ptr->var_name, "show_wait")) {
 				int val = atoi(ptr->val);
@@ -352,9 +327,7 @@ int main(void) {
 		fprintf(g_errfile, "failed to open demos folder '%s'\n", DEMO_DIR);
 	}
 
-#ifdef SHOW_ANTICHEAT
 	fprintf(g_outfile, "\ntimescale detected on %u demos\n", _g_num_timescale);
-#endif
 
 	if (_g_expected_maps) {
 		bool did_hdr = false;
@@ -369,11 +342,9 @@ int main(void) {
 	}
 
 	config_free_newline_sep(g_cmd_whitelist);
-#ifdef SHOW_ANTICHEAT
 	config_free_newline_sep(g_sar_sum_whitelist);
 	config_free_var_whitelist(g_filesum_whitelist);
 	config_free_var_whitelist(g_cvar_whitelist);
-#endif
 
 	fclose(g_errfile);
 	fclose(g_outfile);
