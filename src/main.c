@@ -254,9 +254,22 @@ void run_demo(const char *path) {
 	demo_free(demo);
 }
 
-int main(void) {
-	g_errfile = fopen(ERR_FILE, "w");
-	g_outfile = fopen(OUT_FILE, "w");
+int main(int argc, char **argv) {
+	const char *dem_name = NULL;
+	if (argc == 1) {
+		g_errfile = fopen(ERR_FILE, "w");
+		g_outfile = fopen(OUT_FILE, "w");
+	} else if (argc == 2) {
+		g_errfile = stderr;
+		g_outfile = stdout;
+		dem_name = argv[1];
+	} else {
+		const char *name = argv[0] ? argv[0] : "mdp";
+		fprintf(stderr, "Usage:\n");
+		fprintf(stderr, " %s          Traverses every demo in ./demos; outputs to " OUT_FILE " and " ERR_FILE "\n", name);
+		fprintf(stderr, " %s [in.dem] Runs on a specific demo; outputs to stdio\n", name);
+		return 1;
+	}
 
 	_g_expected_maps = (const char **)config_read_newline_sep(EXPECTED_MAPS_FILE);
 	g_cmd_whitelist = config_read_newline_sep(CMD_WHITELIST_FILE);
@@ -304,38 +317,45 @@ int main(void) {
 		config_free_var_whitelist(general_conf);
 	}
 
-	DIR *d = opendir(DEMO_DIR);
-	if (d) {
-		size_t demo_dir_len = strlen(DEMO_DIR);
-		struct dirent *ent;
-		bool is_first = true;
-		while ((ent = readdir(d))) {
-			if (!strcmp(ent->d_name, ".")) continue;
-			if (!strcmp(ent->d_name, "..")) continue;
+	if (dem_name) {
+		run_demo(dem_name);
+		if (_g_detected_timescale) {
+			fputs("\nTIMESCALE DETECTED\n", g_outfile);
+		}
+	} else {
+		DIR *d = opendir(DEMO_DIR);
+		if (d) {
+			size_t demo_dir_len = strlen(DEMO_DIR);
+			struct dirent *ent;
+			bool is_first = true;
+			while ((ent = readdir(d))) {
+				if (!strcmp(ent->d_name, ".")) continue;
+				if (!strcmp(ent->d_name, "..")) continue;
 
-			if (!is_first) {
-				fputs("\n", g_outfile);
+				if (!is_first) {
+					fputs("\n", g_outfile);
+				}
+
+				is_first = false;
+
+				char *path = malloc(demo_dir_len + strlen(ent->d_name) + 2);
+				strcpy(path, DEMO_DIR);
+				strcat(path, "/");
+				strcat(path, ent->d_name);
+
+				_g_detected_timescale = false;
+				run_demo(path);
+
+				free(path);
 			}
 
-			is_first = false;
-
-			char *path = malloc(demo_dir_len + strlen(ent->d_name) + 2);
-			strcpy(path, DEMO_DIR);
-			strcat(path, "/");
-			strcat(path, ent->d_name);
-
-			_g_detected_timescale = false;
-			run_demo(path);
-
-			free(path);
+			closedir(d);
+		} else {
+			fprintf(g_errfile, "failed to open demos folder '%s'\n", DEMO_DIR);
 		}
 
-		closedir(d);
-	} else {
-		fprintf(g_errfile, "failed to open demos folder '%s'\n", DEMO_DIR);
+		fprintf(g_outfile, "\ntimescale detected on %u demos\n", _g_num_timescale);
 	}
-
-	fprintf(g_outfile, "\ntimescale detected on %u demos\n", _g_num_timescale);
 
 	if (_g_expected_maps) {
 		bool did_hdr = false;
