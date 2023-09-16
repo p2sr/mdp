@@ -196,8 +196,8 @@ static int _parse_sar_data(struct sar_data *out, FILE *f, size_t len) {
 		out->slot = data[0];
 		out->portal_placement.orange = data[1];
 		out->portal_placement.x = _read_f32(data + 2);
-		out->portal_placement.x = _read_f32(data + 6);
-		out->portal_placement.x = _read_f32(data + 10);
+		out->portal_placement.y = _read_f32(data + 6);
+		out->portal_placement.z = _read_f32(data + 10);
 
 		break;
 
