@@ -323,6 +323,8 @@ int main(void) {
 
 			free(path);
 		}
+
+		closedir(d);
 	} else {
 		fprintf(g_errfile, "failed to open demos folder '%s'\n", DEMO_DIR);
 	}
