@@ -22,7 +22,8 @@ jobs:
         uses: actions/checkout@v3
       - name: Configure Makefile
         run: |
-          echo "LDFLAGS=-lm -fsanitize=address" > config.mk
+          echo "CFLAGS=-Wall -Werror" > config.mk
+          echo "LDFLAGS=-lm -fsanitize=address" >> config.mk
       - name: Build
         run: make
       - name: Run
