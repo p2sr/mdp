@@ -1,8 +1,6 @@
 obj
 mdp
 mdp.exe
-*.dem
-!data/*.dem
 cmd_whitelist.txt
 sar_whitelist.txt
 cvar_whitelist.txt
@@ -11,5 +9,4 @@ expected_maps.txt
 config.txt
 errors.txt
 output.txt
-demos/
 config.mk
