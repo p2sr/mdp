@@ -27,4 +27,6 @@ jobs:
       - name: Build
         run: make
       - name: Run
-        run: chmod +x mdp && ./mdp data
+        run: |
+          chmod +x mdp
+          ./mdp data
