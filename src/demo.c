@@ -29,6 +29,7 @@ static inline void _sar_data_free(struct sar_data data) {
 		free(data.initial_cvar.val);
 		break;
 
+	case SAR_DATA_ENTITY_INPUT_SLOT:
 	case SAR_DATA_ENTITY_INPUT:
 		free(data.entity_input.targetname);
 		free(data.entity_input.classname);
@@ -83,6 +84,10 @@ static inline void _msg_free(struct demo_msg *msg) {
 
 void demo_free(struct demo *demo) {
 	if (!demo) return;
+	free(demo->hdr.server_name);
+	free(demo->hdr.client_name);
+	free(demo->hdr.map_name);
+	free(demo->hdr.game_directory);
 	for (size_t i = 0; i < demo->nmsgs; ++i) {
 		_msg_free(demo->msgs[i]);
 	}
