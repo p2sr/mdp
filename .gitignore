@@ -2,6 +2,7 @@ obj
 mdp
 mdp.exe
 *.dem
+!data/*.dem
 cmd_whitelist.txt
 sar_whitelist.txt
 cvar_whitelist.txt
