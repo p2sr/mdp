@@ -248,7 +248,7 @@ void run_demo(const char *path) {
 	demo_free(demo);
 }
 
-int main(void) {
+int main(int argc, char **argv) {
 	g_errfile = fopen(ERR_FILE, "w");
 	g_outfile = fopen(OUT_FILE, "w");
 
@@ -298,33 +298,16 @@ int main(void) {
 		config_free_var_whitelist(general_conf);
 	}
 
-	DIR *d = opendir(DEMO_DIR);
-	if (d) {
-		size_t demo_dir_len = strlen(DEMO_DIR);
-		struct dirent *ent;
-		bool is_first = true;
-		while ((ent = readdir(d))) {
-			if (!strcmp(ent->d_name, ".")) continue;
-			if (!strcmp(ent->d_name, "..")) continue;
-
-			if (!is_first) {
-				fputs("\n", g_outfile);
-			}
-
-			is_first = false;
-
-			char *path = malloc(demo_dir_len + strlen(ent->d_name) + 2);
-			strcpy(path, DEMO_DIR);
-			strcat(path, "/");
-			strcat(path, ent->d_name);
+	if (argc >= 2) {
+		fputs("\n", g_outfile);
+		for (int i = 1; i < argc; i ++) {
+			char *path = argv[i];
 
 			_g_detected_timescale = false;
 			run_demo(path);
-
-			free(path);
 		}
 	} else {
-		fprintf(g_errfile, "failed to open demos folder '%s'\n", DEMO_DIR);
+		fputs("no demo file provided on command line\n", g_errfile);
 	}
 
 	fprintf(g_outfile, "\ntimescale detected on %u demos\n", _g_num_timescale);
