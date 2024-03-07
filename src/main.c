@@ -153,6 +153,9 @@ static void _output_sar_data(uint32_t tick, struct sar_data data) {
 			}
 		}
 		break;
+	case SAR_DATA_PORTAL_PLACEMENT:
+		printf("\t\t\t\t{ \"tick\": %d, \"type\": \"portal\", \"value\": %d },\n", tick, data.portal_placement.orange);
+		break;
 	default:
 		// don't care
 		break;
