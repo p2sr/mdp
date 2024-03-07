@@ -72,49 +72,51 @@ static bool _ignore_filesum(const char *path) {
 static const char *const _g_map_found = "_MAP_FOUND";
 static const char **_g_expected_maps;
 
-static bool _g_detected_timescale;
-static int _g_num_timescale;
-
 static void _output_sar_data(uint32_t tick, struct sar_data data) {
 	switch (data.type) {
 	case SAR_DATA_TIMESCALE_CHEAT:
-		if (!_g_detected_timescale) {
-			++_g_num_timescale;
-			_g_detected_timescale = true;
-		}
-		printf("\t\t[%5u] [SAR] timescale %.2f\n", tick, data.timescale);
+		printf("\t\t\t\t{ \"tick\": %d, \"type\": \"timescale\", \"value\": \"%.2f\" },\n", tick, data.timescale);
 		break;
 	case SAR_DATA_INITIAL_CVAR:
 		if (g_config.initial_cvar_mode != 0) {
 			int whitelist_status = config_check_var_whitelist(g_cvar_whitelist, data.initial_cvar.cvar, data.initial_cvar.val);
 			if (!_allow_initial_cvar(data.initial_cvar.cvar, data.initial_cvar.val) && (whitelist_status == 1 || (whitelist_status == 0 && g_config.initial_cvar_mode == 2))) {
-				printf("\t\t[%5u] [SAR] cvar '%s' = '%s'\n", tick, data.initial_cvar.cvar, data.initial_cvar.val);
+				for (size_t i = 0; i < strlen(data.initial_cvar.val); ++i) {
+					if (data.initial_cvar.val[i] == '"') data.initial_cvar.val[i] = '\'';
+				}
+				printf("\t\t\t\t{ \"tick\": %d, \"type\": \"cvar\", \"val\": { \"cvar\": \"%s\", \"val\": \"%s\" } },\n", tick, data.initial_cvar.cvar, data.initial_cvar.val);
 			}
 		}
 		break;
 	case SAR_DATA_PAUSE:
-		printf("\t\t[%5u] [SAR] paused for %d ticks (%.2fs)\n", tick, data.pause_ticks, (float)data.pause_ticks / 60.0f);
+		printf("\t\t\t\t{ \"tick\": %d, \"type\": \"pause\", \"value\": %d },\n", tick, data.pause_ticks);
 		break;
 	case SAR_DATA_INVALID:
-		printf("\t\t[%5u] [SAR] corrupt data!\n", tick);
+		printf("\t\t\t\t{ \"tick\": %d, \"type\": \"invalid\" },\n", tick);
 		break;
 	case SAR_DATA_WAIT_RUN:
-		if (g_config.show_wait) printf("\t\t[%5u] [SAR] wait to %d for '%s'\n", tick, data.wait_run.tick, data.wait_run.cmd);
+		if (g_config.show_wait) printf("\t\t\t\t{ \"tick\": %d, \"type\": \"wait\", \"value\": %d },\n", tick, data.wait_run.tick);
 		break;
 	case SAR_DATA_HWAIT_RUN:
-		if (g_config.show_wait) printf("\t\t[%5u] [SAR] hwait %d ticks for '%s'\n", tick, data.hwait_run.ticks, data.hwait_run.cmd);
+		if (g_config.show_wait) printf("\t\t\t\t{ \"tick\": %d, \"type\": \"hwait\", \"value\": %d },\n", tick, data.hwait_run.ticks);
 		break;
 	case SAR_DATA_SPEEDRUN_TIME:
-		printf("\t\t[%5u] [SAR] Speedrun finished with %zu splits!\n", tick, data.speedrun_time.nsplits);
+		printf("\t\t\t\t{ \"tick\": %d, \"type\": \"speedrun\", \"value\":\n\t\t\t\t\t{\n\t\t\t\t\t\t\"splits\": [\n", tick);
 		{
 			size_t ticks = 0;
 			for (size_t i = 0; i < data.speedrun_time.nsplits; ++i) {
-				printf("\t\t\t%s (%zu segments):\n", data.speedrun_time.splits[i].name, data.speedrun_time.splits[i].nsegs);
+				printf("\t\t\t\t\t\t\t{ \"name\": \"%s\", \"segments\":\n\t\t\t\t\t\t\t\t[\n", data.speedrun_time.splits[i].name);
 				for (size_t j = 0; j < data.speedrun_time.splits[i].nsegs; ++j) {
-					printf("\t\t\t\t%s (%d ticks)\n", data.speedrun_time.splits[i].segs[j].name, data.speedrun_time.splits[i].segs[j].ticks);
+					printf("\t\t\t\t\t\t\t\t\t{ \"name\": \"%s\", \"ticks\": %d }", data.speedrun_time.splits[i].segs[j].name, data.speedrun_time.splits[i].segs[j].ticks);
+					if (j != data.speedrun_time.splits[i].nsegs - 1) printf(",");
+					printf("\n");
 					ticks += data.speedrun_time.splits[i].segs[j].ticks;
 				}
+				printf("\t\t\t\t\t\t\t\t]\n\t\t\t\t\t\t\t}");
+				if (i != data.speedrun_time.nsplits - 1) printf(",");
+				printf("\n");
 			}
+			printf("\t\t\t\t\t\t],\n");
 
 			size_t total = roundf((float)(ticks * 1000) / 60.0f);
 
@@ -126,12 +128,12 @@ static void _output_sar_data(uint32_t tick, struct sar_data data) {
 			total /= 60;
 			int hrs = total;
 
-			printf("\t\t\tTotal: %zu ticks = %d:%02d:%02d.%03d\n", ticks, hrs, mins, secs, ms);
+			printf("\t\t\t\t\t\t\"total\": { \"ticks\": %zu, \"time\": \"%d:%02d:%02d.%03d\" }\n\t\t\t\t\t}\n\t\t\t\t},\n", ticks, hrs, mins, secs, ms);
 		}
 		break;
 	case SAR_DATA_TIMESTAMP:
 		printf(
-			"\t\t[%5u] [SAR] recorded at %04d/%02d/%02d %02d:%02d:%02d UTC\n",
+			"\t\t\t\t{ \"tick\": %d, \"type\": \"timestamp\", \"value\": \"%04d/%02d/%02d %02d:%02d:%02d UTC\" },\n",
 			tick,
 			(int)data.timestamp.year,
 			(int)data.timestamp.mon,
@@ -147,7 +149,7 @@ static void _output_sar_data(uint32_t tick, struct sar_data data) {
 			snprintf(strbuf, sizeof strbuf, "%08X", data.file_checksum.sum);
 			int whitelist_status = config_check_var_whitelist(g_filesum_whitelist, data.file_checksum.path, strbuf);
 			if (!_ignore_filesum(data.file_checksum.path) && (whitelist_status == 1 || (whitelist_status == 0 && g_config.file_sum_mode == 2))) {
-				printf("\t\t[%5u] [SAR] file \"%s\" has checksum %08X\n", tick, data.file_checksum.path, data.file_checksum.sum);
+				printf("\t\t\t\t{ \"tick\": %d, \"type\": \"file\", \"value\": { \"path\": \"%s\", \"sum\": \"%08X\" } },\n", tick, data.file_checksum.path, data.file_checksum.sum);
 			}
 		}
 		break;
@@ -161,7 +163,10 @@ static void _output_msg(struct demo_msg *msg) {
 	switch (msg->type) {
 	case DEMO_MSG_CONSOLE_CMD:
 		if (!config_check_cmd_whitelist(g_cmd_whitelist, msg->con_cmd)) {
-			printf("\t\t[%5u] %s\n", msg->tick, msg->con_cmd);
+			for (size_t i = 0; i < strlen(msg->con_cmd); ++i) {
+				if (msg->con_cmd[i] == '"') msg->con_cmd[i] = '\'';
+			}
+			printf("\t\t\t\t{ \"tick\": %d, \"type\": \"cmd\", \"value\": \"%s\" },\n", msg->tick, msg->con_cmd);
 		}
 		break;
 	case DEMO_MSG_SAR_DATA:
@@ -174,16 +179,12 @@ static void _output_msg(struct demo_msg *msg) {
 
 static void _validate_checksum(uint32_t demo_given, uint32_t sar_given, uint32_t demo_real) {
 	bool demo_matches = demo_given == demo_real;
-	if (demo_matches) {
-		if (g_config.show_passing_checksums) printf("\tdemo checksum PASS (%X)\n", demo_real);
-	} else {
-		printf("\tdemo checksum FAIL (%X; should be %X)\n", demo_given, demo_real);
+	if (!demo_matches) {
+		printf("\t\t\t\t{ \"tick\": 0, \"type\": \"demosum\", \"value\": { \"given\": \"%X\", \"real\": \"%X\" } },\n", demo_given, demo_real);
 	}
 
-	if (config_check_sum_whitelist(g_sar_sum_whitelist, sar_given)) {
-		if (g_config.show_passing_checksums) printf("\tSAR checksum PASS (%X)\n", sar_given);
-	} else {
-		printf("\tSAR checksum FAIL (%X)\n", sar_given);
+	if (!config_check_sum_whitelist(g_sar_sum_whitelist, sar_given)) {
+		printf("\t\t\t\t{ \"tick\": 0, \"type\": \"sarsum\", \"value\": \"%X\" },\n", sar_given);
 	}
 }
 
@@ -191,15 +192,19 @@ void run_demo(const char *path) {
 	struct demo *demo = demo_parse(path);
 
 	if (!demo) {
-		printf("failed to parse demo!\n");
+		printf("\t\tnull");
 		return;
 	}
 
 	bool has_csum = false;
 
-	printf("demo: '%s'\n", path);
-	printf("\t'%s' on %s - %.2f TPS - %d ticks\n", demo->hdr.client_name, demo->hdr.map_name, (float)demo->hdr.playback_ticks / demo->hdr.playback_time, demo->hdr.playback_ticks);
-	printf("\tevents:\n");
+	printf("\t\t{\n");
+	printf("\t\t\t\"file\": \"%s\",\n", path);
+	printf("\t\t\t\"user\": \"%s\",\n", demo->hdr.client_name);
+	printf("\t\t\t\"map\": \"%s\",\n", demo->hdr.map_name);
+	printf("\t\t\t\"tps\": %.2f,\n", (float)demo->hdr.playback_ticks / demo->hdr.playback_time);
+	printf("\t\t\t\"ticks\": %d,\n", demo->hdr.playback_ticks);
+	printf("\t\t\t\"events\": [\n");
 	for (size_t i = 0; i < demo->nmsgs; ++i) {
 		struct demo_msg *msg = demo->msgs[i];
 		if (i == demo->nmsgs - 1 && msg->type == DEMO_MSG_SAR_DATA && msg->sar_data.type == SAR_DATA_CHECKSUM) {
@@ -213,17 +218,21 @@ void run_demo(const char *path) {
 	}
 
 	if (demo->v2sum_state == V2SUM_INVALID) {
-		printf("\tdemo v2 checksum FAIL\n");
+
+		printf("\t\t\t\t{ \"tick\": 0, \"type\": \"demosum\", \"value\": null },\n");
+
 	} else if (demo->v2sum_state == V2SUM_VALID) {
-		if (g_config.show_passing_checksums) printf("\tdemo v2 checksum PASS\n");
+		
 		struct demo_msg *msg = demo->msgs[demo->nmsgs - 1];
 		uint32_t sar_sum = msg->sar_data.checksum_v2.sar_sum;
-		if (config_check_sum_whitelist(g_sar_sum_whitelist, sar_sum)) {
-			if (g_config.show_passing_checksums) printf("\tSAR checksum PASS (%X)\n", sar_sum);
-		} else {
-			printf("\tSAR checksum FAIL (%X)\n", sar_sum);
+
+		if (!config_check_sum_whitelist(g_sar_sum_whitelist, sar_sum)) {
+			printf("\t\t\t\t{ \"tick\": 0, \"type\": \"sarsum\", \"value\": \"%X\" },\n", sar_sum);
 		}
+
 	}
+	// this really just compensates for the extra comma in the last event
+	printf("\t\t\t\t{ \"tick\": 0, \"type\": \"end\", \"value\": null }\n\t\t\t]\n\t\t}\n");
 
 	if (_g_expected_maps) {
 		for (size_t i = 0; _g_expected_maps[i]; ++i) {
@@ -289,18 +298,16 @@ int main(int argc, char **argv) {
 	}
 
 	if (argc >= 2) {
-		printf("\n");
+		printf("\n{\n\t\"demos\": [\n");
 		for (int i = 1; i < argc; i ++) {
 			char *path = argv[i];
-
-			_g_detected_timescale = false;
+			if (i > 1) printf(",\n");
 			run_demo(path);
 		}
+		printf("\t]\n}\n");
 	} else {
 		printf("no demo file provided on command line\n");
 	}
-
-	printf("\ntimescale detected on %u demos\n", _g_num_timescale);
 
 	if (_g_expected_maps) {
 		bool did_hdr = false;
