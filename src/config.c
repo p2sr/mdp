@@ -11,7 +11,7 @@
 char **config_read_newline_sep(const char *path) {
 	FILE *f = fopen(path, "r");
 	if (!f) {
-		fprintf(g_errfile, "%s: failed to open file\n", path);
+		printf("%s: failed to open file\n", path);
 		return NULL;
 	}
 
@@ -28,7 +28,7 @@ char **config_read_newline_sep(const char *path) {
 		}
 
 		if (strlen(line) == 255) {
-			fprintf(g_errfile, "%s: line %zu too long\n", path, lines_count + 1);
+			printf("%s: line %zu too long\n", path, lines_count + 1);
 			free(line);
 			for (size_t i = 0; i < lines_count; ++i) {
 				free(lines[i]);
@@ -95,7 +95,7 @@ void config_free_newline_sep(char **lines) {
 struct var_whitelist *config_read_var_whitelist(const char *path) {
 	FILE *f = fopen(path, "r");
 	if (!f) {
-		fprintf(g_errfile, "%s: failed to open file\n", path);
+		printf("%s: failed to open file\n", path);
 		return NULL;
 	}
 
@@ -112,7 +112,7 @@ struct var_whitelist *config_read_var_whitelist(const char *path) {
 		}
 
 		if (strlen(line) == 255) {
-			fprintf(g_errfile, "%s: line %zu too long\n", path, entry_count + 1);
+			printf("%s: line %zu too long\n", path, entry_count + 1);
 			free(line);
 			for (size_t i = 0; i < entry_count; ++i) {
 				free(list[i].var_name);
