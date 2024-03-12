@@ -512,7 +512,7 @@ static bool _demo_verify_sig(FILE *f, uint32_t sar_sum, const unsigned char *sig
 struct demo *demo_parse(const char *path) {
 	FILE *f = fopen(path, "rb");
 	if (!f) {
-		printf("%s: failed to open file\n", path);
+		fprintf(stderr, "%s: failed to open file\n", path);
 		return NULL;
 	}
 
@@ -521,7 +521,7 @@ struct demo *demo_parse(const char *path) {
 	uint8_t *hdr_buf = malloc(HDR_SIZE);
 
 	if (fread(hdr_buf, 1, HDR_SIZE, f) != HDR_SIZE) {
-		printf("%s: incomplete header\n", path);
+		fprintf(stderr, "%s: incomplete header\n", path);
 		free(hdr_buf);
 		fclose(f);
 		return NULL;
@@ -529,7 +529,7 @@ struct demo *demo_parse(const char *path) {
 
 	// check DemoFileStamp
 	if (strncmp((char *)hdr_buf, "HL2DEMO\0", 8)) {
-		printf("%s: invalid header\n", path);
+		fprintf(stderr, "%s: invalid header\n", path);
 		free(hdr_buf);
 		fclose(f);
 		return NULL;
@@ -537,7 +537,7 @@ struct demo *demo_parse(const char *path) {
 
 	// check DemoProtocol
 	if (_read_u32(hdr_buf + 8) != 4) {
-		printf("%s: unsupported protocol version\n", path);
+		fprintf(stderr, "%s: unsupported protocol version\n", path);
 		free(hdr_buf);
 		fclose(f);
 		return NULL;
@@ -573,8 +573,8 @@ struct demo *demo_parse(const char *path) {
 
 		struct demo_msg *msg = _parse_msg(f);
 		if (!msg) {
-			printf("%s: malformed demo message at offset %ld %ld\n", path, ftell(f), p);
-			printf("THE FOLLOWING DEMO IS CORRUPTED. PARSING AS MUCH AS POSSIBLE\n");
+			fprintf(stderr, "%s: malformed demo message at offset %ld %ld\n", path, ftell(f), p);
+			fprintf(stderr, "THE FOLLOWING DEMO IS CORRUPTED. PARSING AS MUCH AS POSSIBLE\n");
 			/*
 			for (size_t i = 0; i < msg_count; ++i) {
 				_msg_free(msgs[i]);

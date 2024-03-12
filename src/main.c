@@ -247,7 +247,7 @@ void run_demo(const char *path) {
 	}
 
 	if (!has_csum && demo->v2sum_state == V2SUM_NONE) {
-		printf("\tno checksums found; vanilla demo?\n");
+		fprintf(stderr, "no checksums found; vanilla demo?\n");
 	}
 
 	demo_free(demo);
@@ -295,7 +295,7 @@ int main(int argc, char **argv) {
 				continue;
 			}
 
-			printf("bad config option '%s'\n", ptr->var_name);
+			fprintf(stderr, "bad config option '%s'\n", ptr->var_name);
 		}
 		config_free_var_whitelist(general_conf);
 	}
@@ -309,7 +309,7 @@ int main(int argc, char **argv) {
 		}
 		printf("\t]\n}\n");
 	} else {
-		printf("no demo file provided on command line\n");
+		fprintf(stderr, "no demo file provided on command line\n");
 	}
 
 	if (_g_expected_maps) {
@@ -318,9 +318,9 @@ int main(int argc, char **argv) {
 			if (_g_expected_maps[i] == _g_map_found) continue; // This pointer equality check is intentional
 			if (!did_hdr) {
 				did_hdr = true;
-				printf("missing maps:\n");
+				fprintf(stderr, "missing maps:\n");
 			}
-			printf("\t%s\n", _g_expected_maps[i]);
+			fprintf(stderr, "\t%s\n", _g_expected_maps[i]);
 		}
 	}
 
