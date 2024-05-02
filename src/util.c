@@ -6,6 +6,7 @@
 #include "util.h"
 
 void util_strip_whitespace(char *str) {
+	if (strlen(str) == 0) return;
 	size_t i = 0;
 	while (isspace(str[i])) ++i;
 

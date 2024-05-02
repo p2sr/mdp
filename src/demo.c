@@ -247,6 +247,27 @@ static int _parse_sar_data(struct sar_data *out, FILE *f, size_t len) {
 
 		break;
 
+	case SAR_DATA_ENTITY_SERIAL:
+		if (len != 8) {
+			out->type = SAR_DATA_INVALID;
+			break;
+		}
+
+		out->entity_serial.slot = _read_f32(data);
+		out->entity_serial.serial = _read_f32(data);
+
+		break;
+
+	case SAR_DATA_FRAMETIME:
+		if (len != 5) {
+			out->type = SAR_DATA_INVALID;
+			break;
+		}
+
+		out->frametime = _read_f32(data);
+
+		break;
+
 	case SAR_DATA_SPEEDRUN_TIME:
 		if (len < 5) {
 			out->type = SAR_DATA_INVALID;
@@ -307,6 +328,7 @@ static int _parse_sar_data(struct sar_data *out, FILE *f, size_t len) {
 		break;
 
 	default:
+		fprintf(g_errfile, "[SAR] Unhandled message type %02X\n", out->type);
 		out->type = SAR_DATA_INVALID;
 		break;
 	}

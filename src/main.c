@@ -110,6 +110,12 @@ static void _output_sar_data(uint32_t tick, struct sar_data data) {
 	case SAR_DATA_HWAIT_RUN:
 		if (g_config.show_wait) fprintf(g_outfile, "\t\t[%5u] [SAR] hwait %d ticks for '%s'\n", tick, data.hwait_run.ticks, data.hwait_run.cmd);
 		break;
+	case SAR_DATA_ENTITY_SERIAL:
+		fprintf(g_outfile, "\t\t[%5u] [SAR] Entity slot %d serial changed to %d\n", tick, data.entity_serial.slot, data.entity_serial.serial);
+		break;
+	case SAR_DATA_FRAMETIME:
+		fprintf(g_outfile, "\t\t[%5u] [SAR] Frame took %fms\n", tick, data.frametime * 1000.0f);
+		break;
 	case SAR_DATA_SPEEDRUN_TIME:
 		fprintf(g_outfile, "\t\t[%5u] [SAR] Speedrun finished with %zu splits!\n", tick, data.speedrun_time.nsplits);
 		{

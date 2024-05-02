@@ -29,10 +29,12 @@ struct sar_data {
 		SAR_DATA_TIMESTAMP = 0x0B,
 		SAR_DATA_FILE_CHECKSUM = 0x0C,
 		SAR_DATA_HWAIT_RUN = 0x0D,
+		SAR_DATA_ENTITY_SERIAL = 0x0E,
+		SAR_DATA_FRAMETIME = 0x0F,
 		SAR_DATA_CHECKSUM = 0xFF,
 		SAR_DATA_CHECKSUM_V2 = 0xFE,
 
-		SAR_DATA_INVALID,
+		SAR_DATA_INVALID = 0x00,
 	} type;
 
 	int slot;
@@ -40,6 +42,7 @@ struct sar_data {
 	union {
 		float timescale;
 		uint32_t pause_ticks;
+		float frametime;
 
 		struct {
 			char *cvar;
@@ -77,6 +80,11 @@ struct sar_data {
 			int ticks;
 			char *cmd;
 		} hwait_run;
+
+		struct {
+			int slot;
+			int serial;
+		} entity_serial;
 
 		struct {
 			size_t nsplits;
