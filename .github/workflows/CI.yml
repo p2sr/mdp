@@ -49,7 +49,7 @@ jobs:
       - name: Configure Makefile
         run: |
           echo "CC=x86_64-w64-mingw32-gcc" > config.mk
-          echo "CFLAGS=-Wall -Werror" >> config.mk
+          echo "CFLAGS=-Wall -Werror -D__USE_MINGW_ANSI_STDIO" >> config.mk
           echo "LDFLAGS=-lm" >> config.mk
       - name: Build
         run: make
