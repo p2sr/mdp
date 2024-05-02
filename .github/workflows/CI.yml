@@ -1,5 +1,8 @@
 name: CI
 
+# FIXME: LDFLAGS -fsanitize=address on mingw
+# https://stackoverflow.com/a/55019187
+
 on:
   push:
     paths:
@@ -47,7 +50,7 @@ jobs:
         run: |
           echo "CC=x86_64-w64-mingw32-gcc" > config.mk
           echo "CFLAGS=-Wall -Werror" >> config.mk
-          echo "LDFLAGS=-lm -fsanitize=address" >> config.mk
+          echo "LDFLAGS=-lm" >> config.mk
       - name: Build
         run: make
       - name: Run
