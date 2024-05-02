@@ -248,7 +248,7 @@ static int _parse_sar_data(struct sar_data *out, FILE *f, size_t len) {
 		break;
 
 	case SAR_DATA_ENTITY_SERIAL:
-		if (len != 8) {
+		if (len != 9) {
 			out->type = SAR_DATA_INVALID;
 			break;
 		}
