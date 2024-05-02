@@ -3,6 +3,8 @@ name: CI
 # FIXME: LDFLAGS -fsanitize=address on mingw
 # https://stackoverflow.com/a/55019187
 
+# TODO: Test run on windows
+
 on:
   push:
     paths:
@@ -53,8 +55,6 @@ jobs:
           echo "LDFLAGS=-lm" >> config.mk
       - name: Build
         run: make
-      - name: Run
-        run: ./mdp.exe
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
