@@ -170,11 +170,165 @@ static void _output_sar_data(uint32_t tick, struct sar_data data) {
 	}
 }
 
+#define SAR_MSG_INIT_B "&^!$"
+#define SAR_MSG_INIT_O "&^!%"
+#define SAR_MSG_CONT_B "&^?$"
+#define SAR_MSG_CONT_O "&^?%"
+
+static char g_partial[8192];
+static int g_expected_len = 0;
+
+///// START BASE92 /////
+
+// This isn't really base92. Instead, we encode 4-byte input chunks into 5 base92 characters. If the
+// final chunk is not 4 bytes, each byte of it is sent as 2 base92 characters; the receiver infers
+// this from the buffer length and decodes accordingly. This system is almost as space-efficient as
+// is possible.
+
+static char base92_chars[93] = // 93 because null terminator
+	"abcdefghijklmnopqrstuvwxyz"
+	"ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	"0123456789"
+	"!$%^&*-_=+()[]{}<>'@#~;:/?,.|\\";
+
+// doing this at runtime is a little silly but shh
+static const char *base92_reverse() {
+	static char map[256];
+	static int initd = 0;
+	if (initd == 0) {
+		initd = 1;
+		for (int i = 0; i < 92; ++i) {
+			char c = base92_chars[i];
+			map[(int)c] = i;
+		}
+	}
+	return map;
+}
+
+static char *base92_decode(const char *encoded, int len) {
+	const char *base92_rev = base92_reverse();
+
+	static char out[512]; // leave some overhead lol
+	static int outLen;
+	memset(out, 0, sizeof(out));
+	outLen = 0;
+	#define push(val) \
+		out[outLen++] = val;
+	while (len > 6 || len == 5) {
+		unsigned val = base92_rev[(unsigned)encoded[4]];
+		val = (val * 92) + base92_rev[(unsigned)encoded[3]];
+		val = (val * 92) + base92_rev[(unsigned)encoded[2]];
+		val = (val * 92) + base92_rev[(unsigned)encoded[1]];
+		val = (val * 92) + base92_rev[(unsigned)encoded[0]];
+
+		char *raw = (char *)&val;
+		push(raw[0]);
+		push(raw[1]);
+		push(raw[2]);
+		push(raw[3]);
+
+		encoded += 5;
+		len -= 5;
+	}
+	while (len > 0) {
+		unsigned val = base92_rev[(unsigned)encoded[1]];
+		val = (val * 92) + base92_rev[(unsigned)encoded[0]];
+
+		char *raw = (char *)&val;
+		push(raw[0]);
+		encoded += 2;
+		len -= 2;
+	}
+	return out;
+}
+
+///// END BASE92 /////
+
+static bool handleMessage(struct demo_msg *msg) {
+	if (strncmp(msg->con_cmd, "say \"", 5)) return false;
+	if (strlen(msg->con_cmd) < 10) return false;
+	bool has_prefix = true;
+	char *prefix = msg->con_cmd + 5;
+	bool cont, orange;
+	if (!strncmp(prefix, SAR_MSG_INIT_B, 4)) {
+		cont = false;
+		orange = false;
+	} else if (!strncmp(prefix, SAR_MSG_INIT_O, 4)) {
+		cont = false;
+		orange = true;
+	} else if (!strncmp(prefix, SAR_MSG_CONT_B, 4)) {
+		cont = true;
+		orange = false;
+	} else if (!strncmp(prefix, SAR_MSG_CONT_O, 4)) {
+		cont = true;
+		orange = true;
+	} else {
+		has_prefix = false;
+	}
+
+	if (!has_prefix) return false;
+
+	if (cont) {
+		if (!g_expected_len) {
+			fprintf(g_errfile, "\t\t[%5u] Unmatched NetMessage continuation %s\n", msg->tick, msg->con_cmd);
+			return false;
+		}
+		strcat(g_partial, msg->con_cmd + 9);
+	} else {
+		char *raw = base92_decode(msg->con_cmd + 9, 5);
+		g_expected_len = (int)*raw;
+		strcat(g_partial, msg->con_cmd + 14);
+	}
+
+	if (strlen(g_partial) < g_expected_len) {
+		fprintf(g_outfile, "\t\t[%5u] NetMessage continuation %d != %d\n", msg->tick, g_expected_len, (int)strlen(g_partial));
+		return true;
+	} else if (strlen(g_partial) > g_expected_len) {
+		fprintf(g_errfile, "\t\t[%5u] NetMessage length mismatch %d != %d\n", msg->tick, g_expected_len, (int)strlen(g_partial));
+		return false;
+	} else {
+		char *decoded = base92_decode(g_partial, g_expected_len);
+		char *type = decoded;
+		char *data = decoded + strlen(type) + 1;
+
+		fprintf(g_outfile, "\t\t[%5u] NetMessage (%s): %s", msg->tick, orange ? "o" : "b", type);
+
+		// print data
+		int datalen = strlen(data);
+		bool printdata = true;
+		if (!strcmp(type, "srtimer")) {
+			datalen = 4;
+			printdata = false;
+		}
+		if (!strcmp(type, "cmboard")) {
+			datalen = 0;
+		}
+
+		if (datalen > 0) {
+			if (printdata) fprintf(g_outfile, " = %s (", data);
+			else fprintf(g_outfile, " (");
+
+			for (int i = 0; i < datalen; ++i) {
+				fprintf(g_outfile, "%02X", (unsigned char)data[i]);
+				if (i < datalen - 1) fprintf(g_outfile, " ");
+			}
+			if (datalen > 0) fprintf(g_outfile, ")");
+		}
+
+		fprintf(g_outfile, "\n");
+	}
+	g_expected_len = 0;
+	g_partial[0] = 0;
+	return true;
+}
+
 static void _output_msg(struct demo_msg *msg) {
 	switch (msg->type) {
 	case DEMO_MSG_CONSOLE_CMD:
 		if (!config_check_cmd_whitelist(g_cmd_whitelist, msg->con_cmd)) {
-			fprintf(g_outfile, "\t\t[%5u] %s\n", msg->tick, msg->con_cmd);
+			if (!handleMessage(msg)) {
+				fprintf(g_outfile, "\t\t[%5u] %s\n", msg->tick, msg->con_cmd);
+			}
 		}
 		break;
 	case DEMO_MSG_SAR_DATA:
