@@ -10,3 +10,4 @@ config.txt
 errors.txt
 output.txt
 config.mk
+.vscode/*
