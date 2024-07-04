@@ -32,6 +32,7 @@ struct {
 	int initial_cvar_mode; // 0 = don't show, 1 = show not matching, 2 (default) = show not matching or not present
 	bool show_passing_checksums; // should we output successful checksums?
 	bool show_wait; // should we show when 'wait' was run?
+	bool show_splits; // should we show split times?
 } g_config;
 
 static bool _allow_initial_cvar(const char *var, const char *val) {
@@ -117,8 +118,8 @@ static void _output_sar_data(uint32_t tick, struct sar_data data) {
 		fprintf(g_outfile, "\t\t[%5u] [SAR] Frame took %fms\n", tick, data.frametime * 1000.0f);
 		break;
 	case SAR_DATA_SPEEDRUN_TIME:
-		fprintf(g_outfile, "\t\t[%5u] [SAR] Speedrun finished with %zu splits!\n", tick, data.speedrun_time.nsplits);
-		{
+		if (g_config.show_splits) {
+			fprintf(g_outfile, "\t\t[%5u] [SAR] Speedrun finished with %zu splits!\n", tick, data.speedrun_time.nsplits);
 			size_t ticks = 0;
 			for (size_t i = 0; i < data.speedrun_time.nsplits; ++i) {
 				fprintf(g_outfile, "\t\t\t%s (%zu segments):\n", data.speedrun_time.splits[i].name, data.speedrun_time.splits[i].nsegs);
@@ -435,6 +436,7 @@ int main(int argc, char **argv) {
 	g_config.initial_cvar_mode = 2;
 	g_config.show_passing_checksums = false;
 	g_config.show_wait = true;
+	g_config.show_splits = true;
 	struct var_whitelist *general_conf = config_read_var_whitelist(GENERAL_CONF_FILE);
 	if (general_conf) {
 		for (struct var_whitelist *ptr = general_conf; ptr->var_name; ++ptr) {
@@ -463,6 +465,12 @@ int main(int argc, char **argv) {
 			if (!strcmp(ptr->var_name, "show_wait")) {
 				int val = atoi(ptr->val);
 				g_config.show_wait = val != 0;
+				continue;
+			}
+
+			if (!strcmp(ptr->var_name, "show_splits")) {
+				int val = atoi(ptr->val);
+				g_config.show_splits = val != 0;
 				continue;
 			}
 
