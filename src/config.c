@@ -158,10 +158,12 @@ int config_check_var_whitelist(struct var_whitelist *list, const char *var, cons
 	if (!list) return false;
 	bool found = false;
 	while (list->var_name) {
-		if (!strcmp(list->var_name, var)) {
-			found = true;
-			if (!list->val) return 2; // matching
-			if (!strcmp(list->val, val)) return 2; // matching
+		if (strlen(var) >= strlen(list->var_name)) {
+			if (!strcmp(var + strlen(var) - strlen(list->var_name), list->var_name)) {
+				found = true;
+				if (!list->val) return 2; // matching
+				if (!strcmp(list->val, val)) return 2; // matching
+			}
 		}
 		++list;
 	}

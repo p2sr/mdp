@@ -100,6 +100,12 @@ static void _output_sar_data(uint32_t tick, struct sar_data data) {
 	case SAR_DATA_HWAIT_RUN:
 		if (g_config.show_wait) printf("\t\t\t\t{ \"tick\": %d, \"type\": \"hwait\", \"value\": %d },\n", tick, data.hwait_run.ticks);
 		break;
+	case SAR_DATA_ENTITY_SERIAL:
+		printf("\t\t\t\t{ \"tick\": %d, \"type\": \"serial\", \"value\": { \"slot\": %d, \"serial\": %d } },\n", tick, data.entity_serial.slot, data.entity_serial.serial);
+		break;
+	case SAR_DATA_FRAMETIME:
+		printf("\t\t\t\t{ \"tick\": %d, \"type\": \"frametime\", \"value\": %f },\n", tick, data.frametime * 1000.0f);
+		break;
 	case SAR_DATA_SPEEDRUN_TIME:
 		printf("\t\t\t\t{ \"tick\": %d, \"type\": \"speedrun\", \"value\":\n\t\t\t\t\t{\n\t\t\t\t\t\t\"splits\": [\n", tick);
 		{
