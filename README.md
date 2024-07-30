@@ -1,6 +1,7 @@
 # mdp
 
 [![CI](https://github.com/p2sr/mdp/workflows/CI/badge.svg)](https://github.com/p2sr/mdp/actions?query=workflow%3ACI+branch%3Amaster)
+[![CD](https://github.com/p2sr/mdp/workflows/CD/badge.svg)](https://github.com/p2sr/mdp/actions?query=workflow%3ACD+branch%3Amaster)
 
 `mdp` is a very simple demo parser for Portal 2 demos which extracts information injected by [SAR].
 

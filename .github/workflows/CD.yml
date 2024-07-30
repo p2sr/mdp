@@ -1,20 +1,8 @@
-name: CI
-
-# FIXME: LDFLAGS -fsanitize=address on mingw
-# https://stackoverflow.com/a/55019187
-
-# TODO: Test run on windows
+name: CD
 
 on:
   push:
-    paths:
-      - "src/**/*.c"
-      - "src/**/*.h"
-  pull_request:
-    paths:
-      - "src/**/*.c"
-      - "src/**/*.h"
-  workflow_dispatch:
+    tags: '*'
 
 jobs:
   build-lin:
@@ -60,3 +48,41 @@ jobs:
           name: mdp-windows
           path: mdp.exe
           if-no-files-found: error
+  release:
+    name: Release
+    if: github.repository == 'p2sr/mdp'
+    needs: [build-lin, build-win]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get Release Version
+        id: get_release
+        run: echo ::set-output name=version::${GITHUB_REF:10}
+      - name: Download Linux Build
+        uses: actions/download-artifact@v4
+        with:
+          name: mdp-linux
+      - name: Download Windows Build
+        uses: actions/download-artifact@v4
+        with:
+          name: mdp-windows
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          body: |
+            ![CD](https://github.com/p2sr/mdp/workflows/CD/badge.svg)
+
+            **Installation**
+            - Download:
+              - [Windows](https://github.com/p2sr/mdp/releases/download/${{ steps.get_release.outputs.version }}/mdp.exe)
+              - [Linux](https://github.com/p2sr/mdp/releases/download/${{ steps.get_release.outputs.version }}/mdp)
+                - Run `chmod +x mdp`
+
+            ---
+
+            **Changelog**
+            TODO
+          files: |
+            mdp
+            mdp.exe
+          prerelease: false
+          fail_on_unmatched_files: true
