@@ -165,6 +165,11 @@ static void _output_sar_data(uint32_t tick, struct sar_data data) {
 			}
 		}
 		break;
+	case SAR_DATA_QUEUEDCMD:
+		if (!config_check_cmd_whitelist(g_cmd_whitelist, data.queuedcmd)) {
+			fprintf(g_outfile, "\t\t[%5u] [SAR] queued command: %s\n", tick, data.queuedcmd);
+		}
+		break;
 	default:
 		// don't care
 		break;

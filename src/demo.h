@@ -31,6 +31,7 @@ struct sar_data {
 		SAR_DATA_HWAIT_RUN = 0x0D,
 		SAR_DATA_ENTITY_SERIAL = 0x0E,
 		SAR_DATA_FRAMETIME = 0x0F,
+		SAR_DATA_QUEUEDCMD = 0x10,
 		SAR_DATA_CHECKSUM = 0xFF,
 		SAR_DATA_CHECKSUM_V2 = 0xFE,
 
@@ -43,6 +44,7 @@ struct sar_data {
 		float timescale;
 		uint32_t pause_ticks;
 		float frametime;
+		char *queuedcmd;
 
 		struct {
 			char *cvar;

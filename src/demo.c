@@ -327,6 +327,11 @@ static int _parse_sar_data(struct sar_data *out, FILE *f, size_t len) {
 
 		break;
 
+	case SAR_DATA_QUEUEDCMD:
+		out->queuedcmd = strdup((char *)data);
+		
+		break;
+
 	default:
 		fprintf(g_errfile, "[SAR] Unhandled message type %02X\n", out->type);
 		out->type = SAR_DATA_INVALID;
