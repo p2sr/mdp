@@ -33,6 +33,7 @@ struct {
 	bool show_passing_checksums; // should we output successful checksums?
 	bool show_wait; // should we show when 'wait' was run?
 	bool show_splits; // should we show split times?
+	int show_netmessages; // 0 = don't show, 1 = show all except srtimer, 2 = show all
 } g_config;
 
 static bool _allow_initial_cvar(const char *var, const char *val) {
@@ -297,31 +298,33 @@ static bool handleMessage(struct demo_msg *msg) {
 		char *type = decoded;
 		char *data = decoded + strlen(type) + 1;
 
-		fprintf(g_outfile, "\t\t[%5u] NetMessage (%s): %s", msg->tick, orange ? "o" : "b", type);
+		if (g_config.show_netmessages == 2 || (g_config.show_netmessages == 1 && strcmp(type, "srtimer"))) {
+			fprintf(g_outfile, "\t\t[%5u] NetMessage (%s): %s", msg->tick, orange ? "o" : "b", type);
 
-		// print data
-		int datalen = strlen(data);
-		bool printdata = true;
-		if (!strcmp(type, "srtimer")) {
-			datalen = 4;
-			printdata = false;
-		}
-		if (!strcmp(type, "cmboard")) {
-			datalen = 0;
-		}
-
-		if (datalen > 0) {
-			if (printdata) fprintf(g_outfile, " = %s (", data);
-			else fprintf(g_outfile, " (");
-
-			for (int i = 0; i < datalen; ++i) {
-				fprintf(g_outfile, "%02X", (unsigned char)data[i]);
-				if (i < datalen - 1) fprintf(g_outfile, " ");
+			// print data
+			int datalen = strlen(data);
+			bool printdata = true;
+			if (!strcmp(type, "srtimer")) {
+				datalen = 4;
+				printdata = false;
 			}
-			if (datalen > 0) fprintf(g_outfile, ")");
-		}
+			if (!strcmp(type, "cmboard")) {
+				datalen = 0;
+			}
 
-		fprintf(g_outfile, "\n");
+			if (datalen > 0) {
+				if (printdata) fprintf(g_outfile, " = %s (", data);
+				else fprintf(g_outfile, " (");
+
+				for (int i = 0; i < datalen; ++i) {
+					fprintf(g_outfile, "%02X", (unsigned char)data[i]);
+					if (i < datalen - 1) fprintf(g_outfile, " ");
+				}
+				if (datalen > 0) fprintf(g_outfile, ")");
+			}
+
+			fprintf(g_outfile, "\n");
+		}
 	}
 	g_expected_len = 0;
 	g_partial[0] = 0;
@@ -442,6 +445,7 @@ int main(int argc, char **argv) {
 	g_config.show_passing_checksums = false;
 	g_config.show_wait = true;
 	g_config.show_splits = true;
+	g_config.show_netmessages = 2;
 	struct var_whitelist *general_conf = config_read_var_whitelist(GENERAL_CONF_FILE);
 	if (general_conf) {
 		for (struct var_whitelist *ptr = general_conf; ptr->var_name; ++ptr) {
@@ -476,6 +480,14 @@ int main(int argc, char **argv) {
 			if (!strcmp(ptr->var_name, "show_splits")) {
 				int val = atoi(ptr->val);
 				g_config.show_splits = val != 0;
+				continue;
+			}
+
+			if (!strcmp(ptr->var_name, "show_netmessages")) {
+				int val = atoi(ptr->val);
+				if (val < 0) val = 0;
+				if (val > 2) val = 2;
+				g_config.show_netmessages = val;
 				continue;
 			}
 

@@ -68,3 +68,4 @@ This file contains a few configuration settings, configured using lines of the f
 - `show_passing_checksums [0/1]`. Defaults to 0 (off).
 - `show_wait [0/1]`. Defaults to 1 (on).
 - `show_splits [0/1]`. Defaults to 1 (on). Shows splits when a speedrun finishes.
+- `show_netmessages [0/1/2]`. 0 = don't show, 1 = show all except srtimer, 2 (default) = show all.
