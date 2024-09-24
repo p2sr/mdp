@@ -18,6 +18,8 @@
 #define FILESUM_WHITELIST_FILE "filesum_whitelist.txt"
 #define GENERAL_CONF_FILE "config.txt"
 
+#define TICKRATE 60
+
 FILE *g_errfile;
 FILE *g_outfile;
 
@@ -101,7 +103,7 @@ static void _output_sar_data(uint32_t tick, struct sar_data data) {
 		}
 		break;
 	case SAR_DATA_PAUSE:
-		fprintf(g_outfile, "\t\t[%5u] [SAR] paused for %d ticks (%.2fs)", tick, data.pause_time.ticks, (float)data.pause_time.ticks / 60.0f);
+		fprintf(g_outfile, "\t\t[%5u] [SAR] paused for %d ticks (%.2fs)", tick, data.pause_time.ticks, (float)data.pause_time.ticks / TICKRATE);
 		if (data.pause_time.timed != -1) fprintf(g_outfile, " (%s)", data.pause_time.timed ? "timed" : "untimed");
 		fprintf(g_outfile, "\n");
 		break;
@@ -132,7 +134,7 @@ static void _output_sar_data(uint32_t tick, struct sar_data data) {
 				}
 			}
 
-			size_t total = roundf((float)(ticks * 1000) / 60.0f);
+			size_t total = roundf((float)(ticks * 1000) / TICKRATE);
 
 			int ms = total % 1000;
 			total /= 1000;
