@@ -101,7 +101,9 @@ static void _output_sar_data(uint32_t tick, struct sar_data data) {
 		}
 		break;
 	case SAR_DATA_PAUSE:
-		fprintf(g_outfile, "\t\t[%5u] [SAR] paused for %d ticks (%.2fs)\n", tick, data.pause_ticks, (float)data.pause_ticks / 60.0f);
+		fprintf(g_outfile, "\t\t[%5u] [SAR] paused for %d ticks (%.2fs)", tick, data.pause_time.ticks, (float)data.pause_time.ticks / 60.0f);
+		if (data.pause_time.timed != -1) fprintf(g_outfile, " (%s)", data.pause_time.timed ? "timed" : "untimed");
+		fprintf(g_outfile, "\n");
 		break;
 	case SAR_DATA_INVALID:
 		fprintf(g_outfile, "\t\t[%5u] [SAR] corrupt data!\n", tick);

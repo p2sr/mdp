@@ -217,12 +217,13 @@ static int _parse_sar_data(struct sar_data *out, FILE *f, size_t len) {
 		break;
 
 	case SAR_DATA_PAUSE:
-		if (len != 5) {
+		if (len < 5 || len > 6) {
 			out->type = SAR_DATA_INVALID;
 			break;
 		}
 
-		out->pause_ticks = _read_u32(data);
+		out->pause_time.ticks = _read_u32(data);
+		out->pause_time.timed = len == 6 ? data[4] : -1;
 		break;
 
 	case SAR_DATA_WAIT_RUN:

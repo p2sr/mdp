@@ -42,9 +42,13 @@ struct sar_data {
 
 	union {
 		float timescale;
-		uint32_t pause_ticks;
 		float frametime;
 		char *queuedcmd;
+
+		struct {
+			uint32_t ticks;
+			int timed;
+		} pause_time;
 
 		struct {
 			char *cvar;
