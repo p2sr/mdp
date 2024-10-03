@@ -152,6 +152,7 @@ struct demo {
 	size_t nmsgs;
 	struct demo_msg **msgs;
 	uint32_t checksum;
+	float tickrate;
 	enum {
 		V2SUM_NONE,
 		V2SUM_INVALID,

@@ -18,8 +18,6 @@
 #define FILESUM_WHITELIST_FILE "filesum_whitelist.txt"
 #define GENERAL_CONF_FILE "config.txt"
 
-#define TICKRATE 60
-
 FILE *g_errfile;
 FILE *g_outfile;
 
@@ -85,7 +83,7 @@ static const char **_g_expected_maps;
 static bool _g_detected_timescale;
 static int _g_num_timescale;
 
-static void _output_sar_data(uint32_t tick, struct sar_data data) {
+static void _output_sar_data(struct demo *demo, uint32_t tick, struct sar_data data) {
 	switch (data.type) {
 	case SAR_DATA_TIMESCALE_CHEAT:
 		if (!_g_detected_timescale) {
@@ -103,7 +101,7 @@ static void _output_sar_data(uint32_t tick, struct sar_data data) {
 		}
 		break;
 	case SAR_DATA_PAUSE:
-		fprintf(g_outfile, "\t\t[%5u] [SAR] paused for %d ticks (%.2fs)", tick, data.pause_time.ticks, (float)data.pause_time.ticks / TICKRATE);
+		fprintf(g_outfile, "\t\t[%5u] [SAR] paused for %d ticks (%.2fs)", tick, data.pause_time.ticks, (float)data.pause_time.ticks / demo->tickrate);
 		if (data.pause_time.timed != -1) fprintf(g_outfile, " (%s)", data.pause_time.timed ? "timed" : "untimed");
 		fprintf(g_outfile, "\n");
 		break;
@@ -134,7 +132,7 @@ static void _output_sar_data(uint32_t tick, struct sar_data data) {
 				}
 			}
 
-			size_t total = roundf((float)(ticks * 1000) / TICKRATE);
+			size_t total = roundf((float)(ticks * 1000) / demo->tickrate);
 
 			int ms = total % 1000;
 			total /= 1000;
@@ -335,7 +333,7 @@ static bool handleMessage(struct demo_msg *msg) {
 	return true;
 }
 
-static void _output_msg(struct demo_msg *msg) {
+static void _output_msg(struct demo *demo, struct demo_msg *msg) {
 	switch (msg->type) {
 	case DEMO_MSG_CONSOLE_CMD:
 		if (!config_check_cmd_whitelist(g_cmd_whitelist, msg->con_cmd)) {
@@ -345,7 +343,7 @@ static void _output_msg(struct demo_msg *msg) {
 		}
 		break;
 	case DEMO_MSG_SAR_DATA:
-		_output_sar_data(msg->tick, msg->sar_data);
+		_output_sar_data(demo, msg->tick, msg->sar_data);
 		break;
 	default:
 		break;
@@ -378,7 +376,7 @@ void run_demo(const char *path) {
 	bool has_csum = false;
 
 	fprintf(g_outfile, "demo: '%s'\n", path);
-	fprintf(g_outfile, "\t'%s' on %s - %.2f TPS - %d ticks\n", demo->hdr.client_name, demo->hdr.map_name, (float)demo->hdr.playback_ticks / demo->hdr.playback_time, demo->hdr.playback_ticks);
+	fprintf(g_outfile, "\t'%s' on %s - %.2f TPS - %d ticks\n", demo->hdr.client_name, demo->hdr.map_name, demo->tickrate, demo->hdr.playback_ticks);
 	fprintf(g_outfile, "\tevents:\n");
 	for (size_t i = 0; i < demo->nmsgs; ++i) {
 		struct demo_msg *msg = demo->msgs[i];
@@ -388,7 +386,7 @@ void run_demo(const char *path) {
 			has_csum = true;
 		} else {
 			// normal message
-			_output_msg(msg);
+			_output_msg(demo, msg);
 		}
 	}
 

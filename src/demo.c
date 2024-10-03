@@ -656,6 +656,7 @@ struct demo *demo_parse(const char *path) {
 	demo->msgs = msgs;
 	demo->checksum = checksum;
 	demo->v2sum_state = v2sum_present ? (v2sum_valid ? V2SUM_VALID : V2SUM_INVALID) : V2SUM_NONE;
+	demo->tickrate = (float)hdr.playback_ticks / hdr.playback_time;
 
 	return demo;
 }
