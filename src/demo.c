@@ -119,6 +119,7 @@ static inline float _read_f32(const uint8_t *buf) {
 
 static int _parse_sar_data(struct sar_data *out, FILE *f, size_t len) {
 	if (len == 0) {
+		fprintf(g_errfile, "[SAR] Empty message\n");
 		out->type = SAR_DATA_INVALID;
 		return 0;
 	}
@@ -145,6 +146,7 @@ static int _parse_sar_data(struct sar_data *out, FILE *f, size_t len) {
 	switch (out->type) {
 	case SAR_DATA_TIMESCALE_CHEAT:
 		if (len != 5) {
+			fprintf(g_errfile, "[SAR] Invalid timescale cheat message length %zu\n", len);
 			out->type = SAR_DATA_INVALID;
 			break;
 		}
@@ -172,6 +174,7 @@ static int _parse_sar_data(struct sar_data *out, FILE *f, size_t len) {
 
 	case SAR_DATA_CHECKSUM:
 		if (len != 9) {
+			fprintf(g_errfile, "[SAR] Invalid checksum message length %zu\n", len);
 			out->type = SAR_DATA_INVALID;
 			break;
 		}
@@ -183,6 +186,7 @@ static int _parse_sar_data(struct sar_data *out, FILE *f, size_t len) {
 
 	case SAR_DATA_CHECKSUM_V2:
 		if (len != 69) {
+			fprintf(g_errfile, "[SAR] Invalid checksum v2 message length %zu\n", len);
 			out->type = SAR_DATA_INVALID;
 			break;
 		}
@@ -194,6 +198,7 @@ static int _parse_sar_data(struct sar_data *out, FILE *f, size_t len) {
 
 	case SAR_DATA_PORTAL_PLACEMENT:
 		if (len != 15) {
+			fprintf(g_errfile, "[SAR] Invalid portal placement message length %zu\n", len);
 			out->type = SAR_DATA_INVALID;
 			break;
 		}
@@ -209,6 +214,7 @@ static int _parse_sar_data(struct sar_data *out, FILE *f, size_t len) {
 	case SAR_DATA_CHALLENGE_FLAGS:
 	case SAR_DATA_CROUCH_FLY:
 		if (len != 2) {
+			fprintf(g_errfile, "[SAR] Invalid challenge flags message length %zu\n", len);
 			out->type = SAR_DATA_INVALID;
 			break;
 		}
@@ -218,6 +224,7 @@ static int _parse_sar_data(struct sar_data *out, FILE *f, size_t len) {
 
 	case SAR_DATA_PAUSE:
 		if (len < 5 || len > 6) {
+			fprintf(g_errfile, "[SAR] Invalid pause message length %zu\n", len);
 			out->type = SAR_DATA_INVALID;
 			break;
 		}
@@ -228,6 +235,7 @@ static int _parse_sar_data(struct sar_data *out, FILE *f, size_t len) {
 
 	case SAR_DATA_WAIT_RUN:
 		if (len < 6) {
+			fprintf(g_errfile, "[SAR] Invalid wait run message length %zu\n", len);
 			out->type = SAR_DATA_INVALID;
 			break;
 		}
@@ -239,6 +247,7 @@ static int _parse_sar_data(struct sar_data *out, FILE *f, size_t len) {
 
 	case SAR_DATA_HWAIT_RUN:
 		if (len < 6) {
+			fprintf(g_errfile, "[SAR] Invalid hwait run message length %zu\n", len);
 			out->type = SAR_DATA_INVALID;
 			break;
 		}
@@ -250,6 +259,7 @@ static int _parse_sar_data(struct sar_data *out, FILE *f, size_t len) {
 
 	case SAR_DATA_ENTITY_SERIAL:
 		if (len != 9) {
+			fprintf(g_errfile, "[SAR] Invalid entity serial message length %zu\n", len);
 			out->type = SAR_DATA_INVALID;
 			break;
 		}
@@ -261,6 +271,7 @@ static int _parse_sar_data(struct sar_data *out, FILE *f, size_t len) {
 
 	case SAR_DATA_FRAMETIME:
 		if (len != 5) {
+			fprintf(g_errfile, "[SAR] Invalid frametime message length %zu\n", len);
 			out->type = SAR_DATA_INVALID;
 			break;
 		}
@@ -271,6 +282,7 @@ static int _parse_sar_data(struct sar_data *out, FILE *f, size_t len) {
 
 	case SAR_DATA_SPEEDRUN_TIME:
 		if (len < 5) {
+			fprintf(g_errfile, "[SAR] Invalid speedrun time message length %zu\n", len);
 			out->type = SAR_DATA_INVALID;
 			break;
 		}
@@ -298,12 +310,16 @@ static int _parse_sar_data(struct sar_data *out, FILE *f, size_t len) {
 			}
 		}
 
-		if (data != data_orig + len - 1) out->type = SAR_DATA_INVALID;
+		if (data != data_orig + len - 1) {
+			fprintf(g_errfile, "[SAR] Speedrun time data length mismatch %zu %zu\n", data - data_orig, len - 1);
+			out->type = SAR_DATA_INVALID;
+		}
 
 		break;
 
 	case SAR_DATA_TIMESTAMP:
 		if (len != 8) {
+			fprintf(g_errfile, "[SAR] Invalid timestamp message length %zu\n", len);
 			out->type = SAR_DATA_INVALID;
 			break;
 		}
@@ -319,6 +335,7 @@ static int _parse_sar_data(struct sar_data *out, FILE *f, size_t len) {
 
 	case SAR_DATA_FILE_CHECKSUM:
 		if (len < 6) {
+			fprintf(g_errfile, "[SAR] Invalid file checksum message length %zu\n", len);
 			out->type = SAR_DATA_INVALID;
 			break;
 		}
