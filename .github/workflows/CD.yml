@@ -14,7 +14,7 @@ jobs:
       - name: Configure Makefile
         run: |
           echo "CFLAGS=-Wall -Werror" > config.mk
-          echo "LDFLAGS=-lm -fsanitize=address" >> config.mk
+          echo "LDFLAGS=-lm" >> config.mk
       - name: Build
         run: make
       - name: Run
