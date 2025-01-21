@@ -53,7 +53,12 @@ static inline void _sar_data_free(struct sar_data data) {
 			free(data.speedrun_time.splits[i].name);
 			free(data.speedrun_time.splits[i].segs);
 		}
+		for (size_t i = 0; i < data.speedrun_time.nrules; ++i) {
+			free(data.speedrun_time.rules[i].name);
+			free(data.speedrun_time.rules[i].data);
+		}
 		free(data.speedrun_time.splits);
+		if (data.speedrun_time.rules) free(data.speedrun_time.rules);
 		break;
 
 	case SAR_DATA_FILE_CHECKSUM:
@@ -308,6 +313,42 @@ static int _parse_sar_data(struct sar_data *out, FILE *f, size_t len) {
 				out->speedrun_time.splits[i].segs[j].ticks = _read_u32(data);
 				data += 4;
 			}
+		}
+
+		out->speedrun_time.nrules = 0;
+		out->speedrun_time.rules = NULL;
+
+		if (data > data_orig + len - 1) {
+			fprintf(g_errfile, "[SAR] Speedrun time data length mismatch %zu %zu\n", data - data_orig, len - 1);
+			out->type = SAR_DATA_INVALID;
+			break;
+		}
+
+		if (data == data_orig + len - 1) {
+			break;
+		}
+
+		size_t rule_ver = _read_u32(data);
+		data += 4;
+		switch (rule_ver) {
+			case 1:
+				out->speedrun_time.nrules = _read_u32(data);
+				data += 4;
+
+				out->speedrun_time.rules = malloc(out->speedrun_time.nrules * sizeof out->speedrun_time.rules[0]);
+
+				for (size_t i = 0; i < out->speedrun_time.nrules; ++i) {
+					out->speedrun_time.rules[i].name = strdup((char *)data);
+					data += strlen(out->speedrun_time.rules[i].name) + 1;
+
+					out->speedrun_time.rules[i].data = strdup((char *)data);
+					data += strlen(out->speedrun_time.rules[i].data) + 1;
+				}
+				break;
+			default:
+				fprintf(g_errfile, "[SAR] Unhandled speedrun time rule version %zu\n", rule_ver);
+				out->type = SAR_DATA_INVALID;
+				break;
 		}
 
 		if (data != data_orig + len - 1) {

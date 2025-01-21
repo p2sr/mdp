@@ -131,6 +131,12 @@ static void _output_sar_data(struct demo *demo, uint32_t tick, struct sar_data d
 					ticks += data.speedrun_time.splits[i].segs[j].ticks;
 				}
 			}
+			if (data.speedrun_time.nrules > 0) {
+				fprintf(g_outfile, "\t\t\tRules:\n");
+				for (size_t i = 0; i < data.speedrun_time.nrules; ++i) {
+					fprintf(g_outfile, "\t\t\t\t%s = %s\n", data.speedrun_time.rules[i].name, data.speedrun_time.rules[i].data);
+				}
+			}
 
 			size_t total = roundf((float)(ticks * 1000) / demo->tickrate);
 

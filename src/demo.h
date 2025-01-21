@@ -102,6 +102,11 @@ struct sar_data {
 					int ticks;
 				} *segs;
 			} *splits;
+			size_t nrules;
+			struct {
+				char *name;
+				char *data;
+			} *rules;
 		} speedrun_time;
 
 		struct {
