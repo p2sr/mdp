@@ -31,6 +31,8 @@ struct {
 	int file_sum_mode; // 0 = don't show, 1 = show not matching, 2 (default) = show not matching or not present
 	int initial_cvar_mode; // 0 = don't show, 1 = show not matching, 2 (default) = show not matching or not present
 	bool show_passing_checksums; // should we output successful checksums?
+	bool show_speedrun_identifier; // should we show speedrun identifier data?
+	bool show_incomplete_speedrun_summaries; // should we show incomplete speedrun summaries?
 	bool show_wait; // should we show when 'wait' was run?
 	bool show_splits; // should we show split times?
 	int show_netmessages; // 0 = don't show, 1 = show all except srtimer, 2 = show all
@@ -83,6 +85,39 @@ static const char **_g_expected_maps;
 static bool _g_detected_timescale;
 static int _g_num_timescale;
 
+static void _output_speedrun_summary(const struct demo *demo, uint32_t tick, const char *label, struct sar_speedrun_summary summary) {
+	if (!g_config.show_splits) return;
+
+	fprintf(g_outfile, "\t\t[%5u] [SAR] %s with %zu splits!\n", tick, label, summary.nsplits);
+
+	size_t ticks = 0;
+	for (size_t i = 0; i < summary.nsplits; ++i) {
+		fprintf(g_outfile, "\t\t\t%s (%zu segments):\n", summary.splits[i].name, summary.splits[i].nsegs);
+		for (size_t j = 0; j < summary.splits[i].nsegs; ++j) {
+			fprintf(g_outfile, "\t\t\t\t%s (%d ticks)\n", summary.splits[i].segs[j].name, summary.splits[i].segs[j].ticks);
+			ticks += summary.splits[i].segs[j].ticks;
+		}
+	}
+
+	if (summary.nrules > 0) {
+		fprintf(g_outfile, "\t\t\tRules:\n");
+		for (size_t i = 0; i < summary.nrules; ++i) {
+			fprintf(g_outfile, "\t\t\t\t%s = %s\n", summary.rules[i].name, summary.rules[i].data);
+		}
+	}
+
+	size_t total = roundf((float)(ticks * 1000) / demo->tickrate);
+	int ms = total % 1000;
+	total /= 1000;
+	int secs = total % 60;
+	total /= 60;
+	int mins = total % 60;
+	total /= 60;
+	int hrs = total;
+
+	fprintf(g_outfile, "\t\t\tTotal: %zu ticks = %d:%02d:%02d.%03d\n", ticks, hrs, mins, secs, ms);
+}
+
 static void _output_sar_data(struct demo *demo, uint32_t tick, struct sar_data data) {
 	switch (data.type) {
 	case SAR_DATA_TIMESCALE_CHEAT:
@@ -121,35 +156,7 @@ static void _output_sar_data(struct demo *demo, uint32_t tick, struct sar_data d
 		fprintf(g_outfile, "\t\t[%5u] [SAR] Frame took %fms\n", tick, data.frametime * 1000.0f);
 		break;
 	case SAR_DATA_SPEEDRUN_TIME:
-		if (g_config.show_splits) {
-			fprintf(g_outfile, "\t\t[%5u] [SAR] Speedrun finished with %zu splits!\n", tick, data.speedrun_time.nsplits);
-			size_t ticks = 0;
-			for (size_t i = 0; i < data.speedrun_time.nsplits; ++i) {
-				fprintf(g_outfile, "\t\t\t%s (%zu segments):\n", data.speedrun_time.splits[i].name, data.speedrun_time.splits[i].nsegs);
-				for (size_t j = 0; j < data.speedrun_time.splits[i].nsegs; ++j) {
-					fprintf(g_outfile, "\t\t\t\t%s (%d ticks)\n", data.speedrun_time.splits[i].segs[j].name, data.speedrun_time.splits[i].segs[j].ticks);
-					ticks += data.speedrun_time.splits[i].segs[j].ticks;
-				}
-			}
-			if (data.speedrun_time.nrules > 0) {
-				fprintf(g_outfile, "\t\t\tRules:\n");
-				for (size_t i = 0; i < data.speedrun_time.nrules; ++i) {
-					fprintf(g_outfile, "\t\t\t\t%s = %s\n", data.speedrun_time.rules[i].name, data.speedrun_time.rules[i].data);
-				}
-			}
-
-			size_t total = roundf((float)(ticks * 1000) / demo->tickrate);
-
-			int ms = total % 1000;
-			total /= 1000;
-			int secs = total % 60;
-			total /= 60;
-			int mins = total % 60;
-			total /= 60;
-			int hrs = total;
-
-			fprintf(g_outfile, "\t\t\tTotal: %zu ticks = %d:%02d:%02d.%03d\n", ticks, hrs, mins, secs, ms);
-		}
+		_output_speedrun_summary(demo, tick, "Speedrun finished", data.speedrun_time);
 		break;
 	case SAR_DATA_TIMESTAMP:
 		fprintf(
@@ -177,6 +184,41 @@ static void _output_sar_data(struct demo *demo, uint32_t tick, struct sar_data d
 	case SAR_DATA_QUEUEDCMD:
 		if (!config_check_cmd_whitelist(g_cmd_whitelist, data.queuedcmd)) {
 			fprintf(g_outfile, "\t\t[%5u] [SAR] queued command: %s\n", tick, data.queuedcmd);
+		}
+		break;
+	case SAR_DATA_VPK_CHECKSUM:
+		if (g_config.file_sum_mode != 0) {
+			bool printed = false;
+			for (size_t i = 0; i < data.vpk_checksum.nentries; ++i) {
+				char strbuf[9];
+				snprintf(strbuf, sizeof strbuf, "%08X", data.vpk_checksum.entries[i].sum);
+				int whitelist_status = config_check_var_whitelist(g_filesum_whitelist, data.vpk_checksum.entries[i].path, strbuf);
+				if (whitelist_status == 1 || (whitelist_status == 0 && g_config.file_sum_mode == 2)) {
+					if (!printed) {
+						fprintf(g_outfile, "\t\t[%5u] [SAR] VPK \"%s\" has checksum %08X\n", tick, data.vpk_checksum.path, data.vpk_checksum.sum);
+						printed = true;
+					}
+					fprintf(g_outfile, "\t\t\t\"%s\" has checksum %08X\n", data.vpk_checksum.entries[i].path, data.vpk_checksum.entries[i].sum);
+				}
+			}
+		}
+		break;
+	case SAR_DATA_SPEEDRUN_TIME_INCOMPLETE:
+		if (g_config.show_incomplete_speedrun_summaries) {
+			_output_speedrun_summary(demo, tick, "Incomplete speedrun summary", data.speedrun_time_incomplete);
+		}
+		break;
+	case SAR_DATA_SPEEDRUN_ID:
+		if (g_config.show_speedrun_identifier) {
+			fprintf(
+				g_outfile,
+				"\t\t[%5u] [SAR] speedrun identifier %02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X\n",
+				tick,
+				data.speedrun_id[0], data.speedrun_id[1], data.speedrun_id[2], data.speedrun_id[3],
+				data.speedrun_id[4], data.speedrun_id[5], data.speedrun_id[6], data.speedrun_id[7],
+				data.speedrun_id[8], data.speedrun_id[9], data.speedrun_id[10], data.speedrun_id[11],
+				data.speedrun_id[12], data.speedrun_id[13], data.speedrun_id[14], data.speedrun_id[15]
+			);
 		}
 		break;
 	default:
@@ -451,6 +493,8 @@ int main(int argc, char **argv) {
 	g_config.file_sum_mode = 2;
 	g_config.initial_cvar_mode = 2;
 	g_config.show_passing_checksums = false;
+	g_config.show_speedrun_identifier = true;
+	g_config.show_incomplete_speedrun_summaries = true;
 	g_config.show_wait = true;
 	g_config.show_splits = true;
 	g_config.show_netmessages = 2;
@@ -476,6 +520,18 @@ int main(int argc, char **argv) {
 			if (!strcmp(ptr->var_name, "show_passing_checksums")) {
 				int val = atoi(ptr->val);
 				g_config.show_passing_checksums = val != 0;
+				continue;
+			}
+
+			if (!strcmp(ptr->var_name, "show_speedrun_identifier")) {
+				int val = atoi(ptr->val);
+				g_config.show_speedrun_identifier = val != 0;
+				continue;
+			}
+
+			if (!strcmp(ptr->var_name, "show_incomplete_speedrun_summaries")) {
+				int val = atoi(ptr->val);
+				g_config.show_incomplete_speedrun_summaries = val != 0;
 				continue;
 			}
 

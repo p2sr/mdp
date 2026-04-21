@@ -1,6 +1,8 @@
 #ifndef DEMO_H
 #define DEMO_H
 
+#include <stddef.h>
+#include <stdbool.h>
 #include <stdint.h>
 
 struct demo_hdr {
@@ -12,6 +14,33 @@ struct demo_hdr {
 	uint32_t playback_ticks;
 	uint32_t playback_frames;
 	uint32_t sign_on_length;
+};
+
+struct sar_speedrun_summary {
+	size_t nsplits;
+	struct sar_speedrun_split {
+		char *name;
+		size_t nsegs;
+		struct sar_speedrun_seg {
+			char *name;
+			int ticks;
+		} *segs;
+	} *splits;
+	size_t nrules;
+	struct sar_speedrun_rule {
+		char *name;
+		char *data;
+	} *rules;
+};
+
+struct sar_vpk_checksum {
+	char *path;
+	uint32_t sum;
+	size_t nentries;
+	struct sar_vpk_checksum_entry {
+		char *path;
+		uint32_t sum;
+	} *entries;
 };
 
 struct sar_data {
@@ -32,6 +61,9 @@ struct sar_data {
 		SAR_DATA_ENTITY_SERIAL = 0x0E,
 		SAR_DATA_FRAMETIME = 0x0F,
 		SAR_DATA_QUEUEDCMD = 0x10,
+		SAR_DATA_VPK_CHECKSUM = 0x11,
+		SAR_DATA_SPEEDRUN_TIME_INCOMPLETE = 0x12,
+		SAR_DATA_SPEEDRUN_ID = 0x13,
 		SAR_DATA_CHECKSUM = 0xFF,
 		SAR_DATA_CHECKSUM_V2 = 0xFE,
 
@@ -92,22 +124,8 @@ struct sar_data {
 			int serial;
 		} entity_serial;
 
-		struct {
-			size_t nsplits;
-			struct {
-				char *name;
-				size_t nsegs;
-				struct {
-					char *name;
-					int ticks;
-				} *segs;
-			} *splits;
-			size_t nrules;
-			struct {
-				char *name;
-				char *data;
-			} *rules;
-		} speedrun_time;
+		struct sar_speedrun_summary speedrun_time;
+		struct sar_speedrun_summary speedrun_time_incomplete;
 
 		struct {
 			uint16_t year;
@@ -122,6 +140,10 @@ struct sar_data {
 			char *path;
 			uint32_t sum;
 		} file_checksum;
+
+		struct sar_vpk_checksum vpk_checksum;
+
+		unsigned char speedrun_id[16];
 	};
 };
 

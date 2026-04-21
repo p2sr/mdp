@@ -22,6 +22,22 @@ static unsigned char _g_demo_sign_pubkey[32] = {
 
 // Freeing {{{
 
+static inline void _speedrun_summary_free(struct sar_speedrun_summary summary) {
+	for (size_t i = 0; i < summary.nsplits; ++i) {
+		for (size_t j = 0; j < summary.splits[i].nsegs; ++j) {
+			free(summary.splits[i].segs[j].name);
+		}
+		free(summary.splits[i].name);
+		free(summary.splits[i].segs);
+	}
+	for (size_t i = 0; i < summary.nrules; ++i) {
+		free(summary.rules[i].name);
+		free(summary.rules[i].data);
+	}
+	free(summary.splits);
+	free(summary.rules);
+}
+
 static inline void _sar_data_free(struct sar_data data) {
 	switch (data.type) {
 	case SAR_DATA_INITIAL_CVAR:
@@ -46,23 +62,23 @@ static inline void _sar_data_free(struct sar_data data) {
 		break;
 
 	case SAR_DATA_SPEEDRUN_TIME:
-		for (size_t i = 0; i < data.speedrun_time.nsplits; ++i) {
-			for (size_t j = 0; j < data.speedrun_time.splits[i].nsegs; ++j) {
-				free(data.speedrun_time.splits[i].segs[j].name);
-			}
-			free(data.speedrun_time.splits[i].name);
-			free(data.speedrun_time.splits[i].segs);
-		}
-		for (size_t i = 0; i < data.speedrun_time.nrules; ++i) {
-			free(data.speedrun_time.rules[i].name);
-			free(data.speedrun_time.rules[i].data);
-		}
-		free(data.speedrun_time.splits);
-		if (data.speedrun_time.rules) free(data.speedrun_time.rules);
+		_speedrun_summary_free(data.speedrun_time);
+		break;
+
+	case SAR_DATA_SPEEDRUN_TIME_INCOMPLETE:
+		_speedrun_summary_free(data.speedrun_time_incomplete);
 		break;
 
 	case SAR_DATA_FILE_CHECKSUM:
 		free(data.file_checksum.path);
+		break;
+
+	case SAR_DATA_VPK_CHECKSUM:
+		free(data.vpk_checksum.path);
+		for (size_t i = 0; i < data.vpk_checksum.nentries; ++i) {
+			free(data.vpk_checksum.entries[i].path);
+		}
+		free(data.vpk_checksum.entries);
 		break;
 
 	default:
@@ -116,6 +132,89 @@ static inline float _read_f32(const uint8_t *buf) {
 	union { uint32_t i; float f; } u;
 	u.i = _read_u32(buf);
 	return u.f;
+}
+
+static int _parse_speedrun_summary(struct sar_speedrun_summary *out, uint8_t *data, size_t len) {
+	uint8_t *data_orig = data;
+	uint8_t *data_end = data + len;
+	int ret = 1;
+
+	memset(out, 0, sizeof *out);
+
+	if (len < 4) goto done;
+
+	out->nsplits = _read_u32(data);
+	data += 4;
+
+	out->splits = calloc(out->nsplits, sizeof out->splits[0]);
+	for (size_t i = 0; i < out->nsplits; ++i) {
+		if (data >= data_end) goto done;
+		out->splits[i].name = strdup((char *)data);
+		data += strlen(out->splits[i].name) + 1;
+
+		if (data + 4 > data_end) goto done;
+		out->splits[i].nsegs = _read_u32(data);
+		data += 4;
+
+		out->splits[i].segs = calloc(out->splits[i].nsegs, sizeof out->splits[i].segs[0]);
+		for (size_t j = 0; j < out->splits[i].nsegs; ++j) {
+			if (data >= data_end) goto done;
+			out->splits[i].segs[j].name = strdup((char *)data);
+			data += strlen(out->splits[i].segs[j].name) + 1;
+
+			if (data + 4 > data_end) goto done;
+			out->splits[i].segs[j].ticks = _read_u32(data);
+			data += 4;
+		}
+	}
+
+	if (data > data_end) {
+		goto done;
+	}
+
+	if (data == data_end) {
+		ret = 0;
+		goto done;
+	}
+
+	if (data + 4 > data_end) goto done;
+	size_t rule_ver = _read_u32(data);
+	data += 4;
+	switch (rule_ver) {
+	case 1:
+		if (data + 4 > data_end) goto done;
+		out->nrules = _read_u32(data);
+		data += 4;
+
+		out->rules = calloc(out->nrules, sizeof out->rules[0]);
+		for (size_t i = 0; i < out->nrules; ++i) {
+			if (data >= data_end) goto done;
+			out->rules[i].name = strdup((char *)data);
+			data += strlen(out->rules[i].name) + 1;
+
+			if (data >= data_end) goto done;
+			out->rules[i].data = strdup((char *)data);
+			data += strlen(out->rules[i].data) + 1;
+		}
+		break;
+	default:
+		fprintf(g_errfile, "[SAR] Unhandled speedrun time rule version %zu\n", rule_ver);
+		goto done;
+	}
+
+	if (data != data_end) {
+		fprintf(g_errfile, "[SAR] Speedrun time data length mismatch %zu %zu\n", data - data_orig, len);
+		goto done;
+	}
+
+	ret = 0;
+
+done:
+	if (ret != 0) {
+		_speedrun_summary_free(*out);
+		memset(out, 0, sizeof *out);
+	}
+	return ret;
 }
 
 // }}}
@@ -292,70 +391,9 @@ static int _parse_sar_data(struct sar_data *out, FILE *f, size_t len) {
 			break;
 		}
 
-		out->speedrun_time.nsplits = _read_u32(data);
-		data += 4;
-
-		out->speedrun_time.splits = malloc(out->speedrun_time.nsplits * sizeof out->speedrun_time.splits[0]);
-
-		for (size_t i = 0; i < out->speedrun_time.nsplits; ++i) {
-			out->speedrun_time.splits[i].name = strdup((char *)data);
-			data += strlen(out->speedrun_time.splits[i].name) + 1;
-
-			out->speedrun_time.splits[i].nsegs = _read_u32(data);
-			data += 4;
-
-			out->speedrun_time.splits[i].segs = malloc(out->speedrun_time.splits[i].nsegs * sizeof out->speedrun_time.splits[i].segs[0]);
-
-			for (size_t j = 0; j < out->speedrun_time.splits[i].nsegs; ++j) {
-				out->speedrun_time.splits[i].segs[j].name = strdup((char *)data);
-				data += strlen(out->speedrun_time.splits[i].segs[j].name) + 1;
-
-				out->speedrun_time.splits[i].segs[j].ticks = _read_u32(data);
-				data += 4;
-			}
-		}
-
-		out->speedrun_time.nrules = 0;
-		out->speedrun_time.rules = NULL;
-
-		if (data > data_orig + len - 1) {
-			fprintf(g_errfile, "[SAR] Speedrun time data length mismatch %zu %zu\n", data - data_orig, len - 1);
-			out->type = SAR_DATA_INVALID;
-			break;
-		}
-
-		if (data == data_orig + len - 1) {
-			break;
-		}
-
-		size_t rule_ver = _read_u32(data);
-		data += 4;
-		switch (rule_ver) {
-			case 1:
-				out->speedrun_time.nrules = _read_u32(data);
-				data += 4;
-
-				out->speedrun_time.rules = malloc(out->speedrun_time.nrules * sizeof out->speedrun_time.rules[0]);
-
-				for (size_t i = 0; i < out->speedrun_time.nrules; ++i) {
-					out->speedrun_time.rules[i].name = strdup((char *)data);
-					data += strlen(out->speedrun_time.rules[i].name) + 1;
-
-					out->speedrun_time.rules[i].data = strdup((char *)data);
-					data += strlen(out->speedrun_time.rules[i].data) + 1;
-				}
-				break;
-			default:
-				fprintf(g_errfile, "[SAR] Unhandled speedrun time rule version %zu\n", rule_ver);
-				out->type = SAR_DATA_INVALID;
-				break;
-		}
-
-		if (data != data_orig + len - 1) {
-			fprintf(g_errfile, "[SAR] Speedrun time data length mismatch %zu %zu\n", data - data_orig, len - 1);
+		if (_parse_speedrun_summary(&out->speedrun_time, data, len - 1)) {
 			out->type = SAR_DATA_INVALID;
 		}
-
 		break;
 
 	case SAR_DATA_TIMESTAMP:
@@ -389,6 +427,77 @@ static int _parse_sar_data(struct sar_data *out, FILE *f, size_t len) {
 	case SAR_DATA_QUEUEDCMD:
 		out->queuedcmd = strdup((char *)data);
 		
+		break;
+
+	case SAR_DATA_VPK_CHECKSUM:
+		if (len < 10) {
+			fprintf(g_errfile, "[SAR] Invalid VPK checksum message length %zu\n", len);
+			out->type = SAR_DATA_INVALID;
+			break;
+		}
+
+		out->vpk_checksum.sum = _read_u32(data);
+		data += 4;
+
+		out->vpk_checksum.path = strdup((char *)data);
+		data += strlen(out->vpk_checksum.path) + 1;
+		if (data + 4 > data_orig + len - 1) {
+			fprintf(g_errfile, "[SAR] Invalid VPK checksum message length %zu\n", len);
+			out->type = SAR_DATA_INVALID;
+			break;
+		}
+
+		out->vpk_checksum.nentries = _read_u32(data);
+		data += 4;
+
+		out->vpk_checksum.entries = calloc(out->vpk_checksum.nentries, sizeof out->vpk_checksum.entries[0]);
+		for (size_t i = 0; i < out->vpk_checksum.nentries; ++i) {
+			if (data + 4 > data_orig + len - 1) {
+				fprintf(g_errfile, "[SAR] VPK checksum data length mismatch %zu %zu\n", data - data_orig, len - 1);
+				out->type = SAR_DATA_INVALID;
+				break;
+			}
+			out->vpk_checksum.entries[i].sum = _read_u32(data);
+			data += 4;
+
+			out->vpk_checksum.entries[i].path = strdup((char *)data);
+			data += strlen(out->vpk_checksum.entries[i].path) + 1;
+		}
+
+		if (out->type != SAR_DATA_INVALID && data != data_orig + len - 1) {
+			fprintf(g_errfile, "[SAR] VPK checksum data length mismatch %zu %zu\n", data - data_orig, len - 1);
+			out->type = SAR_DATA_INVALID;
+		}
+		if (out->type == SAR_DATA_INVALID) {
+			free(out->vpk_checksum.path);
+			for (size_t i = 0; i < out->vpk_checksum.nentries; ++i) {
+				free(out->vpk_checksum.entries[i].path);
+			}
+			free(out->vpk_checksum.entries);
+			memset(&out->vpk_checksum, 0, sizeof out->vpk_checksum);
+		}
+		break;
+
+	case SAR_DATA_SPEEDRUN_TIME_INCOMPLETE:
+		if (len < 5) {
+			fprintf(g_errfile, "[SAR] Invalid incomplete speedrun time message length %zu\n", len);
+			out->type = SAR_DATA_INVALID;
+			break;
+		}
+
+		if (_parse_speedrun_summary(&out->speedrun_time_incomplete, data, len - 1)) {
+			out->type = SAR_DATA_INVALID;
+		}
+		break;
+
+	case SAR_DATA_SPEEDRUN_ID:
+		if (len != 17) {
+			fprintf(g_errfile, "[SAR] Invalid speedrun identifier message length %zu\n", len);
+			out->type = SAR_DATA_INVALID;
+			break;
+		}
+
+		memcpy(out->speedrun_id, data, 16);
 		break;
 
 	default:
