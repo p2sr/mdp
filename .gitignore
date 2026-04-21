@@ -5,6 +5,7 @@ cmd_whitelist.txt
 sar_whitelist.txt
 cvar_whitelist.txt
 filesum_whitelist.txt
+vpk_directories_whitelist.txt
 expected_maps.txt
 config.txt
 errors.txt

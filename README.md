@@ -59,6 +59,15 @@ This is a whitelist of file checksums - SAR adds checksums for certain important
 placing its name in this file, or a specific checksum can be allowed for it by writing its name, then a space, then the expected checksum. Allowed values are
 omitted from output.
 
+For VPK checksum data, this whitelist is checked against the outer VPK path/checksum. If it matches, the VPK is omitted from output.
+
+### `vpk_directories_whitelist.txt`
+
+This is a whitelist for files inside VPK checksum data. Each line is `path checksum`, where `path` is matched as a suffix and `checksum` is an 8-digit hex
+value. You can use `*` as the checksum to allow any checksum for that path.
+
+If a VPK is not matched by `filesum_whitelist.txt`, then all inner VPK entries are checked against this file. Only non-matching entries are shown in output.
+
 ### `config.txt`
 
 This file contains a few configuration settings, configured using lines of the format `key value`. Possible options:

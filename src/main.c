@@ -16,6 +16,7 @@
 #define SAR_WHITELIST_FILE "sar_whitelist.txt"
 #define CVAR_WHITELIST_FILE "cvar_whitelist.txt"
 #define FILESUM_WHITELIST_FILE "filesum_whitelist.txt"
+#define VPK_DIRECTORIES_WHITELIST_FILE "vpk_directories_whitelist.txt"
 #define GENERAL_CONF_FILE "config.txt"
 
 FILE *g_errfile;
@@ -24,6 +25,7 @@ FILE *g_outfile;
 static char **g_cmd_whitelist;
 static char **g_sar_sum_whitelist;
 static struct var_whitelist *g_filesum_whitelist;
+static struct var_whitelist *g_vpk_directories_whitelist;
 static struct var_whitelist *g_cvar_whitelist;
 
 // general config options
@@ -76,6 +78,23 @@ static bool _ignore_filesum(const char *path) {
 		if (!strncmp(path, "portal2_dlc2/", 13)) return true;
 	}
 	return false;
+}
+
+static int _check_vpk_directory_whitelist(const char *path, const char *sum) {
+	if (!g_vpk_directories_whitelist) return 0;
+
+	bool found = false;
+	for (struct var_whitelist *entry = g_vpk_directories_whitelist; entry->var_name; ++entry) {
+		size_t path_len = strlen(path);
+		size_t entry_len = strlen(entry->var_name);
+		if (path_len < entry_len) continue;
+		if (strcmp(entry->var_name, "*") && strcmp(path + path_len - entry_len, entry->var_name)) continue;
+
+		found = true;
+		if (!entry->val || !strcmp(entry->val, "*") || !strcmp(entry->val, sum)) return 2;
+	}
+
+	return found ? 1 : 0;
 }
 
 // janky hack lol
@@ -188,11 +207,16 @@ static void _output_sar_data(struct demo *demo, uint32_t tick, struct sar_data d
 		break;
 	case SAR_DATA_VPK_CHECKSUM:
 		if (g_config.file_sum_mode != 0) {
+			char strbuf[9];
+			snprintf(strbuf, sizeof strbuf, "%08X", data.vpk_checksum.sum);
+			if (config_check_var_whitelist(g_filesum_whitelist, data.vpk_checksum.path, strbuf) == 2) {
+				break;
+			}
+
 			bool printed = false;
 			for (size_t i = 0; i < data.vpk_checksum.nentries; ++i) {
-				char strbuf[9];
 				snprintf(strbuf, sizeof strbuf, "%08X", data.vpk_checksum.entries[i].sum);
-				int whitelist_status = config_check_var_whitelist(g_filesum_whitelist, data.vpk_checksum.entries[i].path, strbuf);
+				int whitelist_status = _check_vpk_directory_whitelist(data.vpk_checksum.entries[i].path, strbuf);
 				if (whitelist_status == 1 || (whitelist_status == 0 && g_config.file_sum_mode == 2)) {
 					if (!printed) {
 						fprintf(g_outfile, "\t\t[%5u] [SAR] VPK \"%s\" has checksum %08X\n", tick, data.vpk_checksum.path, data.vpk_checksum.sum);
@@ -488,6 +512,7 @@ int main(int argc, char **argv) {
 	g_cmd_whitelist = config_read_newline_sep(CMD_WHITELIST_FILE);
 	g_sar_sum_whitelist = config_read_newline_sep(SAR_WHITELIST_FILE);
 	g_filesum_whitelist = config_read_var_whitelist(FILESUM_WHITELIST_FILE);
+	g_vpk_directories_whitelist = config_read_var_whitelist(VPK_DIRECTORIES_WHITELIST_FILE);
 	g_cvar_whitelist = config_read_var_whitelist(CVAR_WHITELIST_FILE);
 
 	g_config.file_sum_mode = 2;
@@ -615,6 +640,7 @@ int main(int argc, char **argv) {
 	config_free_newline_sep(g_cmd_whitelist);
 	config_free_newline_sep(g_sar_sum_whitelist);
 	config_free_var_whitelist(g_filesum_whitelist);
+	config_free_var_whitelist(g_vpk_directories_whitelist);
 	config_free_var_whitelist(g_cvar_whitelist);
 
 	fclose(g_errfile);
