@@ -70,6 +70,7 @@ static inline void _sar_data_free(struct sar_data data) {
 		break;
 
 	case SAR_DATA_FILE_CHECKSUM:
+	case SAR_DATA_VSCRIPT_CHECKSUM:
 		free(data.file_checksum.path);
 		break;
 
@@ -413,6 +414,7 @@ static int _parse_sar_data(struct sar_data *out, FILE *f, size_t len) {
 		break;
 
 	case SAR_DATA_FILE_CHECKSUM:
+	case SAR_DATA_VSCRIPT_CHECKSUM:
 		if (len < 6) {
 			fprintf(g_errfile, "[SAR] Invalid file checksum message length %zu\n", len);
 			out->type = SAR_DATA_INVALID;
