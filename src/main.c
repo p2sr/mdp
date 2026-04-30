@@ -33,6 +33,7 @@ struct {
 	int file_sum_mode; // 0 = don't show, 1 = show not matching, 2 (default) = show not matching or not present
 	int initial_cvar_mode; // 0 = don't show, 1 = show not matching, 2 (default) = show not matching or not present
 	bool show_passing_checksums; // should we output successful checksums?
+	bool show_vscript_checksums; // should we show vscript checksum data?
 	bool show_speedrun_identifier; // should we show speedrun identifier data?
 	bool show_incomplete_speedrun_summaries; // should we show incomplete speedrun summaries?
 	bool show_wait; // should we show when 'wait' was run?
@@ -191,12 +192,18 @@ static void _output_sar_data(struct demo *demo, uint32_t tick, struct sar_data d
 		);
 		break;
 	case SAR_DATA_FILE_CHECKSUM:
+	case SAR_DATA_VSCRIPT_CHECKSUM:
+		if (data.type == SAR_DATA_VSCRIPT_CHECKSUM && !g_config.show_vscript_checksums) {
+			break;
+		}
+
 		if (g_config.file_sum_mode != 0) {
+			const char *kind = data.type == SAR_DATA_VSCRIPT_CHECKSUM ? "vscript" : "file";
 			char strbuf[9];
 			snprintf(strbuf, sizeof strbuf, "%08X", data.file_checksum.sum);
 			int whitelist_status = config_check_var_whitelist(g_filesum_whitelist, data.file_checksum.path, strbuf);
 			if (!_ignore_filesum(data.file_checksum.path) && (whitelist_status == 1 || (whitelist_status == 0 && g_config.file_sum_mode == 2))) {
-				fprintf(g_outfile, "\t\t[%5u] [SAR] file \"%s\" has checksum %08X\n", tick, data.file_checksum.path, data.file_checksum.sum);
+				fprintf(g_outfile, "\t\t[%5u] [SAR] %s \"%s\" has checksum %08X\n", tick, kind, data.file_checksum.path, data.file_checksum.sum);
 			}
 		}
 		break;
@@ -518,6 +525,7 @@ int main(int argc, char **argv) {
 	g_config.file_sum_mode = 2;
 	g_config.initial_cvar_mode = 2;
 	g_config.show_passing_checksums = false;
+	g_config.show_vscript_checksums = true;
 	g_config.show_speedrun_identifier = true;
 	g_config.show_incomplete_speedrun_summaries = true;
 	g_config.show_wait = true;
@@ -545,6 +553,12 @@ int main(int argc, char **argv) {
 			if (!strcmp(ptr->var_name, "show_passing_checksums")) {
 				int val = atoi(ptr->val);
 				g_config.show_passing_checksums = val != 0;
+				continue;
+			}
+
+			if (!strcmp(ptr->var_name, "show_vscript_checksums")) {
+				int val = atoi(ptr->val);
+				g_config.show_vscript_checksums = val != 0;
 				continue;
 			}
 
