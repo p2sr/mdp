@@ -614,17 +614,32 @@ static struct demo_msg *_parse_msg(FILE *f) {
 		READ_U32(type);
 		READ_U32(size);
 
-		if (type != 0 || size == 8) {
+		if (type == 0xFFFFFFFF && size > 8) {
+			// Callback table. On games without a demo custom data callback
+			// (Portal 2 4554), SAR records its data here behind an entry count
+			// of 0 and a magic, so the vanilla engine ignores it.
+			static const uint8_t sar_table_prefix[8] = { 0, 0, 0, 0, 'S', 'A', 'R', 1 };
+			uint8_t prefix[8];
+			if (fread(prefix, 1, sizeof prefix, f) != sizeof prefix) {
+				free(msg);
+				return NULL;
+			}
+			if (memcmp(prefix, sar_table_prefix, sizeof prefix)) {
+				// a real callback table
+				SKIP_BYTES(size - 8);
+				return msg;
+			}
+		} else if (type != 0 || size == 8) {
 			// not SAR data
 			SKIP_BYTES(size);
 			return msg;
+		} else {
+			// the first 8 bytes (radial menu cursor position) we ignore
+			SKIP_BYTES(8);
 		}
 
 		// SAR data!
 		msg->type = DEMO_MSG_SAR_DATA;
-
-		// the first 8 bytes we ignore
-		SKIP_BYTES(8);
 
 		// now, parse SAR data!
 		if (_parse_sar_data(&msg->sar_data, f, size - 8)) {
